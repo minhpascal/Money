@@ -1,0 +1,75 @@
+Overall Specification Here
+===========================
+Running:
+	Start TWS: kickho112
+	Trader_Workstation_X is in ~/Applications	
+
+Requirements:
+
+1. Must be able to turn on and off auto-trading.
+
+2. Must have a quick way to exit all trades.
+
+3. Must have a way to notify me of a trade entry and exit
+
+4. Must have a data feed for real-time trades.
+
+5. Must have real-time charting that displays trades, real time:
+	a. this must be viewable in different tick periods
+	b. must be viewable in different time periods
+	c. must display configurable moving averages 3.
+
+6.  Must have a Price Server for backtesting
+	a. retrieve quotes live
+	b. retrieve historical quotes from internet
+	c. retrieve stored quotes   
+
+7. Backtester:
+	a. must display trades entry and exit.  
+	b. must also display the trade log with totals
+	c. must allow for different strategies to run
+	
+Example 1 - Standard Method of Determining a Futures Contract void onHowtoDetermineFuture(){
+   Contract contract = new Contract();
+   Order order = new Order();
+   contract.m_symbol = "ES";
+   contract.m_secType = "FUT";
+   contract.m_expiry = "201109";
+   contract.m_exchange = "GLOBEX";
+   contract.m_currency = "USD";
+   order.m_action = "BUY";
+   order.m_totalQuantity = 1;
+   order.m_orderType = "LMT";
+   order.m_lmtPrice = enteredLmtPrice;
+   m_client.placeOrder(GlobalOrderId, contract, order);
+}
+Example 2 - Determining a Futures Contract Using the Local Symbol
+void inUsingLocalSymbolForFuture(){
+   Contract contract = new Contract();
+   Order order = new Order();
+   contract.m_localSymbol = "ESU1";
+   contract.m_secType = "FUT";
+   contract.m_exchange = "GLOBEX";
+   contract.m_currency = "USD";
+   order.m_action = "BUY";
+   order.m_totalQuantity = 1;
+   order.m_orderType = "LMT";
+   order.m_lmtPrice = enteredLmtPrice;
+   m_client.placeOrder(GlobalOrderId, contract, order);
+}
+How to Determine a Stock
+void onHowToDetermineStock(){
+￼￼API Reference Guide 364
+Chapter 5 Java
+￼￼   Contract contract = new Contract();
+   Order order = new Order();
+   contract.m_symbol = "IBKR";
+   contract.m_secType = "STK";
+   contract.m_exchange = "SMART";
+   contract.m_currency = "USD";
+   order.m_action = "BUY";
+   order.m_totalQuantity = 100;
+   order.m_orderType = "LMT";
+   order.m_lmtPrice = enteredLmtPrice;
+   m_client.placeOrder(GlobalOrderId, contract, order);
+}
