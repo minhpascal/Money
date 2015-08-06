@@ -22,6 +22,16 @@
  */
 package eu.verdelhan.ta4j;
 
+import com.ib.controller.NewContract;
+import com.ib.controller.NewOrder;
+import com.ib.controller.NewOrderState;
+import com.ib.controller.OrderStatus;
+import com.ib.controller.ApiController.IOrderHandler;
+import com.ib.controller.Types.Action;
+import com.ib.controller.Types.SecType;
+
+import apidemo.ApiDemo;
+import com.ib.controller.ApiController.IOrderHandler;
 import eu.verdelhan.ta4j.Order.OrderType;
 
 /**
@@ -32,8 +42,12 @@ import eu.verdelhan.ta4j.Order.OrderType;
  *   entry == BUY --> exit == SELL
  *   entry == SELL --> exit == BUY
  */
-public class Trade {
+public class Trade implements IOrderHandler {
 
+	private NewContract ibContract;
+	private NewOrder    ibOrderEntry;
+	private NewOrder	ibOrderExit;
+		
     /** The entry order */
     private Order entry;
 
@@ -49,6 +63,15 @@ public class Trade {
     public Trade() {
         this(OrderType.BUY);
     }
+    
+    public void init() {
+    	ibContract = new NewContract();
+    	ibContract.symbol("ES");
+    	ibContract.secType(SecType.FUT);
+    	ibContract.exchange("GLOBEX");
+    	ibContract.currency("USD");
+    	ibContract.expiry("201509");
+    }
 
     /**
      * Constructor.
@@ -59,8 +82,12 @@ public class Trade {
             throw new IllegalArgumentException("Starting type must not be null");
         }
         this.startingType = startingType;
-        this.entry=null;  	//kk added
-        this.exit=null;		//kk added
+        this.init();
+        
+    }
+    
+    public void setOrderType(OrderType type) {
+    	startingType = type;
     }
 
     /**
@@ -75,6 +102,8 @@ public class Trade {
         this.startingType = entry.getType();
         this.entry = entry;
         this.exit = exit;
+        
+        this.init();
     }
 
     /**
@@ -110,9 +139,11 @@ public class Trade {
      * @param index the tick index
      * @return the order
      */
+    /*
     public Order operate(int index) {
         return operate(index, Decimal.NaN, Decimal.NaN);
     }
+    */
 
     /**
      * Operates the trade at the index-th position
@@ -121,17 +152,38 @@ public class Trade {
      * @param amount the amount
      * @return the order
      */
-    public Order operate(int index, Decimal price, Decimal amount) {
+    public Order operate(int index, Decimal price, Decimal amount,boolean longTrade) {
         Order order = null;
         if (isNew()) {
             order = new Order(index, startingType, price, amount);
             entry = order;
+            
+            //KK IB Order to send to exchange
+            ibOrderEntry = new NewOrder();
+            ibOrderEntry.action((longTrade) ? Action.BUY : Action.SELL);
+            ibOrderEntry.totalQuantity( (int)amount.toDouble());
+            ibOrderEntry.orderType(com.ib.controller.OrderType.MKT);
+            
+			//b.send( contract.secIdType() );
+			//b.send( contract.secId() );
+           
+            placeRealOrderIn();
+             
         } else if (isOpened()) {
             if (index < entry.getIndex()) {
                 throw new IllegalStateException("The index i is less than the entryOrder index");
             }
             order = new Order(index, startingType.complementType(), price, amount);
             exit = order;
+            
+            //KK IB Order to send to exchange
+            ibOrderExit = new NewOrder();
+            ibOrderExit.action((longTrade) ? Action.BUY : Action.SELL);
+            ibOrderExit.totalQuantity( ibOrderEntry.totalQuantity()); 
+            ibOrderExit.orderType(com.ib.controller.OrderType.MKT);
+            
+            //KK Send order to exchange
+            placeRealOrderOut();
         }
         return order;
     }
@@ -161,4 +213,69 @@ public class Trade {
     public String toString() {
         return "Entry: " + entry + " exit: " + exit;
     }
+    
+	//
+	// Function that actually places the live order to the exchange
+	// Contract and the order need to be filled out
+	//
+	
+	public void placeRealOrderIn() {
+		
+		
+		// close window right away for mods
+		//if (ib.orderId() != 0) {
+			//kktbddispose();
+		//}
+		
+		// not connected?
+		/*
+		if( !MoneyCommandCenter.shared().isConnected() ) {
+            notConnected();
+			return;
+		}
+		*/
+	
+		ApiDemo.INSTANCE.controller().placeOrModifyOrder( ibContract, ibOrderEntry, this);	
+	}
+	
+	public void placeRealOrderOut() {
+		
+		ApiDemo.INSTANCE.controller().placeOrModifyOrder( ibContract, ibOrderExit, this);	
+	}
+	
+	//
+	//Callbacks of the iOrderHNdler
+	//
+	public void orderState(NewOrderState orderState)
+	{
+		System.out.format("\nGot an orderState callback:Commission %4.2f",orderState.commission());
+		String state="None";
+		
+		switch (orderState.status()) {
+			case ApiPending:
+				state = "ApiPending"; break;
+			case ApiCancelled:
+				state = "ApiCancelled"; break;
+			case PreSubmitted:
+				state = "PreSubmitted"; break;
+			case PendingCancel:
+				state = "PendingCancel"; break;
+			case Cancelled:
+				state = "Cancelled"; break;
+			case Submitted:
+				state = "Submitted"; break;
+			case Filled:
+				state = "Filled"; break;
+			case Inactive:
+				state = "Inactive"; break;
+			case PendingSubmit:
+				state = "PendingSubmit"; break;
+		}
+		System.out.println(" "+state);
+	}
+	
+	public void handle(int errorCode, String errorMsg)
+	{
+		System.out.format("\nGot a handle callback:Error:%d Msg:%s",errorCode,errorMsg);
+	}
 }

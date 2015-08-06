@@ -21,24 +21,30 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Timer;
 
-import javax.imageio.ImageIO;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultCellEditor;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
-import javax.swing.SwingUtilities;
+import javax.swing.SpringLayout;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
-import javax.swing.Timer;
+import javax.swing.SwingUtilities;
 
+import apidemo.MarketDataPanel.BarResultsPanel;
+import apidemo.MoneyCommandCenter.ChartTickUpdateCallbackHandler;
 import apidemo.util.HtmlButton;
 import apidemo.util.NewTabbedPanel;
 import apidemo.util.TCombo;
@@ -46,7 +52,7 @@ import apidemo.util.UpperField;
 import apidemo.util.VerticalPanel;
 import apidemo.util.NewTabbedPanel.NewTabPanel;
 import apidemo.util.VerticalPanel.StackPanel;
-
+import apidemo.MoneyCommandCenter;
 import com.ib.client.ScannerSubscription;
 import com.ib.controller.Bar;
 import com.ib.controller.Instrument;
@@ -63,12 +69,6 @@ import com.ib.controller.Types.DeepType;
 import com.ib.controller.Types.DurationUnit;
 import com.ib.controller.Types.MktDataType;
 import com.ib.controller.Types.WhatToShow;
-
-
-
-
-
-
 
 //Charting
 import eu.verdelhan.ta4j.Indicator;
@@ -103,7 +103,7 @@ import org.jfree.ui.RefineryUtilities;
 import ta4jexamples.loaders.CsvTicksLoader;
 import ta4jexamples.loaders.CsvTradesLoader;
 
-public class AutoPanel extends JPanel {
+public class AutoPanel extends JPanel  {
 	/**
 	 * 
 	 */
@@ -114,7 +114,7 @@ public class AutoPanel extends JPanel {
 	private TopResultsPanel m_topResultPanel;
 	
 	private final MainRequestPanel m_mainPanel = new MainRequestPanel();
-	
+
 	AutoPanel() {
 		
 		m_autoPanel.addTab( "Main", m_mainPanel);
@@ -141,9 +141,8 @@ public class AutoPanel extends JPanel {
 		p4.add( p2);
 		p4.add( p3, BorderLayout.SOUTH);
 		*/
-
 	}
-	
+
 	//
 	// KK Just display a single graphic
 	//
@@ -175,10 +174,8 @@ public class AutoPanel extends JPanel {
 	    }
 	  */  
 	
-	public class MainRequestPanel extends JPanel implements ItemListener, ActionListener {
-		/**
-		 * 
-		 */
+	public class MainRequestPanel extends JPanel implements ItemListener, ActionListener, ChartTickUpdateCallbackHandler {
+	
 		private static final long serialVersionUID = -8994622134449501051L;
 		final ContractPanel m_contractPanel = new ContractPanel(m_contract);
 		private final JLabel m_status = new JLabel("Disconnected");  //removed
@@ -187,58 +184,77 @@ public class AutoPanel extends JPanel {
 		private final UpperField m_shortMA = new UpperField();
 		private final UpperField m_mediumMA = new UpperField();
 		private final UpperField m_longMA = new UpperField();
+		private MoneyChart _moneyChart=new MoneyChart();
+		
 		JPanel _chartPanel=null;
 		
-		MoneyChart _moneyChart=new MoneyChart();
-		
 		MainRequestPanel() {
-			/*
-			HtmlButton reqTop = new HtmlButton( "Request Top Market Data") {
-				
-				private static final long serialVersionUID = 2158814475499739015L;
 
-				@Override protected void actionPerformed() {
-					onTop();
-				}
-			};
-			*/
-			setLayout(new BoxLayout(this, BoxLayout.X_AXIS));  //Modify this if you want it to go vertical
-			
-			//Add panels in the "Main" panel
-			displayImage("red");
-			add(Box.createRigidArea(new Dimension(10,10)));  //This adds space between items
-						
-			//Enabled Checkbox
-			m_enableAuto = new JCheckBox("Enable Auto Trading");
+			//Initialize Data Items
+			MoneyCommandCenter.shared().setPanelDelegate(this);  //done for the chart update call back
+			m_enableAuto = new JCheckBox();
 			m_enableAuto.setSelected(false);
 			m_enableAuto.addItemListener(this);
-			add(m_enableAuto);
 			
-			//Add Moving Averages
-	    	VerticalPanel a = new VerticalPanel();
-	    	a.add(Box.createGlue());  //rightPanel.add( Box.createVerticalStrut( 20));  try this
-			a.add("Short Moving Average :",m_shortMA);
-			a.add(Box.createGlue());
 			m_shortMA.addActionListener(this);
-			
-			a.add("Medium Moving Average:",m_mediumMA);
-			a.add(Box.createGlue());
 			m_mediumMA.addActionListener(this);
-			
-			a.add("Long Moving Average  :",m_longMA);
-			a.add(Box.createGlue());
 			m_longMA.addActionListener(this);
 			
-			m_shortMA.setText(13);
-			m_mediumMA.setText(34);
-			m_longMA.setText(81);
+			//Initialize Panel View
+			setLayout(new BorderLayout());
 			
-			add(a);
+			JPanel sub = new JPanel(new SpringLayout());
+			sub.add(new JLabel("Enable Auto Trading"));
+			sub.add(m_enableAuto);
+			sub.add(new JLabel("Short Moving Average"));
+			sub.add(m_shortMA);
+			sub.add(new JLabel("Medium Moving Average"));
+			sub.add(m_mediumMA);
+			sub.add(new JLabel("Long Moving Average"));
+			sub.add(m_longMA);
+			JButton refresh = new JButton("Refresh");
+			refresh.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  System.out.println("Kevin, update chart params here");
+				  setVisible( true);
+			  }
+			});
+			JButton refresh2 = new JButton("Req Hist");
+			refresh2.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().requestHistoricalData();
+			  }
+			});
+			sub.add(refresh);
+			sub.add(refresh2);
+			JButton enter = new JButton("Enter");
+			enter.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().testEnter();
+			  }
+			});
+			JButton exit = new JButton("Exit");
+			exit.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().testExit();
+			  }
+			});
+			sub.add(enter);
+			sub.add(exit);
 			
-				//Display the Chart on his own thread
+		      //Lay out the panel.
+	        SpringUtilities.makeCompactGrid(sub,
+	                                        6, 2, //rows, cols
+	                                        6, 6,        //initX, initY
+	                                        6, 6);       //xPad, yPad		
+			add(sub,BorderLayout.WEST);
+			
+			displayImage("red");
+			add(connectedLabel,BorderLayout.EAST);
+	
+			//Display the Chart on his own thread
 			//(new Thread(_moneyChart)).start();
-			_moneyChart.run();
-			
+			_moneyChart.run();	
 			while (_moneyChart.getChartPanel() == null) { 
 				try {
 					Thread.sleep(1000);
@@ -247,114 +263,22 @@ public class AutoPanel extends JPanel {
 					e.printStackTrace();
 				}
 			}
-			add(_moneyChart.getChartPanel());
-	
-			
+			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);	
 			setVisible( true);
 		}
 		
-		public void chartB() {
-			  /**
-	         * Getting time series
-	         */
-	        TimeSeries series = CsvTradesLoader.loadBitstampSeries().subseries(0, Period.hours(6));
-	        
-	        /**
-	         * Creating the OHLC dataset
-	         */
-	        OHLCDataset ohlcDataset = CandlestickChart.createOHLCDataset(series);
-	        
-	        /**
-	         * Creating the additional dataset
-	         */
-	        TimeSeriesCollection xyDataset = CandlestickChart.createAdditionalDataset(series);
-	        
-	        /**
-	         * Creating the chart
-	         */
-	        JFreeChart chart = ChartFactory.createCandlestickChart(
-	                "Bitstamp BTC price",
-	                "Time",
-	                "USD",
-	                ohlcDataset,
-	                true);
-	        // Candlestick rendering
-	        CandlestickRenderer renderer = new CandlestickRenderer();
-	        renderer.setAutoWidthMethod(CandlestickRenderer.WIDTHMETHOD_SMALLEST);
-	        XYPlot plot = chart.getXYPlot();
-	        plot.setRenderer(renderer);
-	        // Additional dataset
-	        int index = 1;
-	        plot.setDataset(index, xyDataset);
-	        plot.mapDatasetToRangeAxis(index, 0);
-	        XYLineAndShapeRenderer renderer2 = new XYLineAndShapeRenderer(true, false);
-	        renderer2.setSeriesPaint(index, Color.blue);
-	        plot.setRenderer(index, renderer2);
-	        // Misc
-	        plot.setRangeGridlinePaint(Color.lightGray);
-	        plot.setBackgroundPaint(Color.white);
-	        NumberAxis numberAxis = (NumberAxis) plot.getRangeAxis();
-	        numberAxis.setAutoRangeIncludesZero(false);
-	        plot.setDatasetRenderingOrder(DatasetRenderingOrder.FORWARD);
-	        
-	        //renderer.
-	        /**
-	         * Displaying the chart
-	         */
-	        JPanel _chartPanel = CandlestickChart.displayChart(chart);
-	        
-	        add(_chartPanel);
-			
-			setVisible( true);			
-			
-		
-			
+		public void updateTick(Tick tick)
+		{
+			_moneyChart.updateTick(tick);
+			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);	
+			setVisible( true);
 		}
 		
-		public void chartA() {
-		     /**
-	         * Getting time series
-	         */
-	        TimeSeries series = CsvTicksLoader.loadAppleIncSeries();
-
-	        /**
-	         * Creating indicators
-	         */
-	        // Close price
-	        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-	        // Bollinger bands
-	        BollingerBandsMiddleIndicator middleBBand = new BollingerBandsMiddleIndicator(closePrice);
-	        BollingerBandsLowerIndicator lowBBand = new BollingerBandsLowerIndicator(middleBBand, closePrice);
-	        BollingerBandsUpperIndicator upBBand = new BollingerBandsUpperIndicator(middleBBand, closePrice);
-
-	        /**
-	         * Building chart dataset
-	         */
-	        TimeSeriesCollection dataset = new TimeSeriesCollection();
-	        dataset.addSeries(IndicatorsToChart.buildChartTimeSeries(series, closePrice, "Apple Inc. (AAPL) - NASDAQ GS"));
-	        dataset.addSeries(IndicatorsToChart.buildChartTimeSeries(series, lowBBand, "Low Bollinger Band"));
-	        dataset.addSeries(IndicatorsToChart.buildChartTimeSeries(series, upBBand, "High Bollinger Band"));
-
-	        /**
-	         * Creating the chart
-	         */
-	        JFreeChart chart = ChartFactory.createTimeSeriesChart(
-	                "Apple Inc. 2013 Close Prices", // title
-	                "Date", // x-axis label
-	                "Price Per Unit", // y-axis label
-	                dataset, // data
-	                true, // create legend?
-	                true, // generate tooltips?
-	                false // generate URLs?
-	                );
-	        XYPlot plot = (XYPlot) chart.getPlot();
-	        DateAxis axis = (DateAxis) plot.getDomainAxis();
-	        axis.setDateFormatOverride(new SimpleDateFormat("yyyy-MM-dd"));
-
-	        /**
-	         * Displaying the chart
-	         */
-	        IndicatorsToChart.displayChart(chart);
+		protected void onHistReqToday() {
+			//m_contractPanel.onOK();
+			//BarResultsPanel panel = new BarResultsPanel( true);
+			//ApiDemo.INSTANCE.controller().reqHistoricalData(m_contract, m_end.getText(), m_duration.getInt(), m_durationUnit.getSelectedItem(), m_barSize.getSelectedItem(), m_whatToShow.getSelectedItem(), m_rthOnly.isSelected(), panel);
+			//m_resultsPanel.addTab( "Historical " + m_contract.symbol(), panel, true, true);
 		}
 
 		//
@@ -370,11 +294,12 @@ public class AutoPanel extends JPanel {
 					
 					BarResultsPanel panel = new BarResultsPanel( false);
 	//KKTBD				ApiDemo.INSTANCE.controller().reqRealTimeBars(m_contract, m_whatToShow.getSelectedItem(), m_rthOnly.isSelected(), panel);
-					m_bPanel.addTab( "Real-time " + m_contract.symbol(), panel, true, true);
-					
+					//m_bPanel.addTab( "Real-time " + m_contract.symbol(), panel, true, true);
+					MoneyCommandCenter.shared().LiveTrading = true;
 					
 				} else {
 					System.out.format("\nAuto Enabled Deselected");
+					MoneyCommandCenter.shared().LiveTrading = false;
 				}
 			}
 		}
@@ -397,7 +322,7 @@ public class AutoPanel extends JPanel {
 		
 		public void displayImage(String inColor)
 		{
-				String colorFile="";
+			String colorFile="";
 			String text="";
 			
 			if (inColor == "green") {
@@ -417,7 +342,7 @@ public class AutoPanel extends JPanel {
 				connectedLabel.setVerticalTextPosition(JLabel.BOTTOM);
 				connectedLabel.setHorizontalTextPosition(JLabel.RIGHT);
 				
-				add(connectedLabel,BorderLayout.WEST);
+				//add(connectedLabel,location);
 				connectedLabel.setSize( 50, 50);
 			}
 			else {
@@ -513,13 +438,12 @@ public class AutoPanel extends JPanel {
 			//Timer Experiment
 			//
 			 //Set up timer to drive animation events.
-	        timer = new Timer(1000, this);
+	        //timer = new Timer(1000, this);
+			//timer = new Timer(1000);
 	        //timer.setInitialDelay(pause);
-	        timer.start(); 
+	        //timer.start(); 
 	 
 	    }
-	 
-	 
 	    //Handle timer event. Update the loopslot (frame number) and the
 	    //offset.  If it's the last frame, restart the timer to get a long
 	    //pause between loops.
@@ -667,7 +591,7 @@ public class AutoPanel extends JPanel {
 		final JCheckBox m_rthOnly = new JCheckBox();
 		
 		HistRequestPanel() { 		
-			m_end.setText( "20120101 12:00:00");
+			m_end.setText( "20150728 12:00:00");
 			m_duration.setText( "1");
 			m_durationUnit.setSelectedItem( DurationUnit.WEEK);
 			m_barSize.setSelectedItem( BarSize._1_hour);

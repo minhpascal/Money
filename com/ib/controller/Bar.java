@@ -4,7 +4,13 @@
 package com.ib.controller;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.Scanner;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.joda.time.DateTime;
 import org.joda.time.Period;
@@ -15,6 +21,8 @@ import eu.verdelhan.ta4j.Tick;
 public class Bar {
 	private static final SimpleDateFormat FORMAT = new SimpleDateFormat( "yyyyMMdd HH:mm:ss"); // format for historical query
 
+	private ArrayList<Bar> bars;
+	
 	private  long m_time;   //This is the # of seconds since 1970
 	private final double m_high;
 	private final double m_low;
@@ -57,6 +65,11 @@ public class Bar {
 		//KK added Volume here
 		return String.format( "%s o:%s h:%s l:%s c:%s v:%s w:%s c:%s", formattedTime(), m_open, m_high, m_low, m_close, m_volume, m_wap, m_count);
 	}
+	
+	public String toStringToFile() {
+		return String.format( "%s!%s!%s!%s!%s!%s!%s!%s", formattedTime(), m_open, m_high, m_low, m_close, m_volume, m_wap, m_count);
+	}
+	
 	//
 	//Helper function to get the tick from the bar
 	//

@@ -64,8 +64,8 @@ public class MaximumDrawdownCriterion extends AbstractAnalysisCriterion {
             Order entry = trade.getEntry();
             Order exit = trade.getExit();
             TradingRecord tradingRecord = new TradingRecord(entry.getType());
-            tradingRecord.operate(entry.getIndex(), entry.getPrice(), entry.getAmount());
-            tradingRecord.operate(exit.getIndex(), exit.getPrice(), exit.getAmount());
+            tradingRecord.operate(entry.getIndex(), entry.getPrice(), entry.getAmount(),true);
+            tradingRecord.operate(exit.getIndex(), exit.getPrice(), exit.getAmount(),false);
             return calculate(series, tradingRecord);
         }
         return 0;

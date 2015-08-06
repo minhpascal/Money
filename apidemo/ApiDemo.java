@@ -39,7 +39,7 @@ import com.ib.controller.Types.NewsType;
 
 public class ApiDemo implements IConnectionHandler {
 	static { NewLookAndFeel.register(); }
-	static ApiDemo INSTANCE = new ApiDemo();
+	static public ApiDemo INSTANCE = new ApiDemo();
 	private final JTextArea m_inLog = new JTextArea();
 	private final JTextArea m_outLog = new JTextArea();
 	private final Logger m_inLogger = new Logger( m_inLog);
@@ -71,9 +71,7 @@ public class ApiDemo implements IConnectionHandler {
 	}
 	
 	private void run() {
-		
-		
-		
+
 		m_tabbedPanel.addTab( "Auto", m_autoPanel);
 		m_tabbedPanel.addTab( "Connection", m_connectionPanel);
 		m_tabbedPanel.addTab( "Market Data", m_mktDataPanel);

@@ -22,6 +22,8 @@
  */
 package eu.verdelhan.ta4j;
 
+import com.ib.controller.NewContract;
+
 /**
  * An order.
  * <p>
@@ -35,7 +37,6 @@ package eu.verdelhan.ta4j;
  * A {@link Trade trade} is a pair of complementary orders.
  */
 public class Order {
-
     /**
      * The type of an {@link Order order}.
      * <p>

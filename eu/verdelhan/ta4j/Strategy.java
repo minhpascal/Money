@@ -42,6 +42,8 @@ public class Strategy {
     
     /** The exit rule */
     private Rule exitRule;
+    
+    protected boolean longTrade=true;
 
     //KKAdded start
     /**
@@ -51,8 +53,7 @@ public class Strategy {
      */
     public Strategy() {
  
-        //this.entryRule=null;
-        //this.exitRule=null;
+
     }
     //KKAdded end
     
@@ -138,5 +139,9 @@ public class Strategy {
      */
     protected void traceShouldExit(int index, boolean exit) {
         log.trace(">>> {}#shouldExit({}): {}", getClass().getSimpleName(), index, exit);
+    }
+    
+    public boolean isLongTrade() {
+    	return longTrade;
     }
 }

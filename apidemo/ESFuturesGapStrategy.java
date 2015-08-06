@@ -21,7 +21,6 @@ public class ESFuturesGapStrategy extends Strategy {
     private VolumeIndicator volume;
     
     public  boolean inTrade=false;
-    public  boolean longTrade=true;
     
     public ESFuturesGapStrategy(ClosePriceIndicator c, SMAIndicator s, SMAIndicator l, MACDIndicator m, VolumeIndicator v) {
 		super();
@@ -33,7 +32,7 @@ public class ESFuturesGapStrategy extends Strategy {
 	    volume = v;
 	    inTrade = false;
 	}
-
+    
     //
     // This is called every period of the tick, so defaults to 30 seconds
     //
