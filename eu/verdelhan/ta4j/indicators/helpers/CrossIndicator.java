@@ -44,7 +44,7 @@ public class CrossIndicator extends CachedIndicator<Boolean> {
      * @param low the lower indicator
      */
     public CrossIndicator(Indicator<Decimal> up, Indicator<Decimal> low) {
-        // TODO: check if up series is equal to low series
+        // TODO: check if up series is equal to02 low series
         super(up);
         this.up = up;
         this.low = low;

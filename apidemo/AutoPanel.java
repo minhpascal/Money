@@ -212,17 +212,16 @@ public class AutoPanel extends JPanel  {
 			sub.add(m_mediumMA);
 			sub.add(new JLabel("Long Moving Average"));
 			sub.add(m_longMA);
-			JButton refresh = new JButton("Refresh");
+			JButton refresh = new JButton("Req Hist");
 			refresh.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
-				  System.out.println("Kevin, update chart params here");
-				  setVisible( true);
+				  MoneyCommandCenter.shared().requestHistoricalData();
 			  }
 			});
-			JButton refresh2 = new JButton("Req Hist");
+			JButton refresh2 = new JButton("Read Hist");
 			refresh2.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
-				  MoneyCommandCenter.shared().requestHistoricalData();
+				  MoneyCommandCenter.shared().runBacktest(1);
 			  }
 			});
 			sub.add(refresh);

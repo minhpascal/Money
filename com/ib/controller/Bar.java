@@ -67,7 +67,7 @@ public class Bar {
 	}
 	
 	public String toStringToFile() {
-		return String.format( "%s!%s!%s!%s!%s!%s!%s!%s", formattedTime(), m_open, m_high, m_low, m_close, m_volume, m_wap, m_count);
+		return String.format( "%s,%s,%s,%s,%s,%s,%s,%s", formattedTime(), m_open, m_high, m_low, m_close, m_volume, m_wap, m_count);
 	}
 	
 	//

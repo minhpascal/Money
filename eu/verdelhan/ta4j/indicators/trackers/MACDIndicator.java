@@ -49,16 +49,4 @@ public class MACDIndicator extends CachedIndicator<Decimal> {
     protected Decimal calculate(int index) {
         return shortTermEma.getValue(index).minus(longTermEma.getValue(index));
     }
-    
-    //
-    //KK Added
-    //
-    
-    public Decimal shortTermValue(int index) {
-    	return shortTermEma.getValue(index);
-    }
-    
-    public Decimal longTermValue(int index) {
-    	return shortTermEma.getValue(index);
-    }
 }
