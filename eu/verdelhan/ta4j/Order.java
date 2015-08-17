@@ -50,11 +50,17 @@ public class Order {
             public OrderType complementType() {
                 return SELL;
             }
+            public String toString() {
+            	return "BUY";
+            }
         },
         SELL {
             @Override
             public OrderType complementType() {
                 return BUY;
+            }
+            public String toString() {
+            	return "SELL";
             }
         };
 

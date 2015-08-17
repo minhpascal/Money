@@ -109,8 +109,6 @@ public class ApiDemo implements IConnectionHandler {
 		m_controller.connect( "127.0.0.1", 7496, 0);
 		
 		MoneyCommandCenter.shared(); //kk added
-		MoneyCommandCenter.shared().start();
-		
     }
 	
 	@Override public void connected() {

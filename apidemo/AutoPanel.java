@@ -149,9 +149,7 @@ public class AutoPanel extends JPanel  {
 	public void displayImage(String inColor)
 	{
 		m_mainPanel.displayImage(inColor);	
-
 	}
-
 	
 	protected ImageIcon createImageIcon(String path,
 			String description) {
@@ -222,10 +220,26 @@ public class AutoPanel extends JPanel  {
 			refresh2.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
 				  MoneyCommandCenter.shared().runBacktest(1);
+					_moneyChart._run();	
+					/*
+					while (_moneyChart.getChartPanel() == null) { 
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException ex) {
+							// TODOasdf
+							ex.printStackTrace();
+						}
+					}
+					*/
+				  updateBacktestChart();
+				  repaint();
+				  setVisible( true);
 			  }
 			});
 			sub.add(refresh);
 			sub.add(refresh2);
+			
+			// Next Row
 			JButton enter = new JButton("Enter");
 			enter.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
@@ -241,28 +255,34 @@ public class AutoPanel extends JPanel  {
 			sub.add(enter);
 			sub.add(exit);
 			
-		      //Lay out the panel.
+			// Next Row
+			JButton acctSummary = new JButton("Account Summary");
+			acctSummary.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().reqAcctSummary();
+			  }
+			});
+			JButton openTrades = new JButton("Live Orders");
+			openTrades.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().reqLiveOrders();
+			  }
+			});
+			sub.add(acctSummary);
+			sub.add(openTrades);
+
+			//Dimension dim = sub.getMaximumSize();
+			
+			//System.out.format("Width:%f Height:%f",dim.getWidth(),dim.getHeight());
+		    //Lay out the panel.
 	        SpringUtilities.makeCompactGrid(sub,
-	                                        6, 2, //rows, cols
+	                                        7, 2, 	//rows, cols
 	                                        6, 6,        //initX, initY
 	                                        6, 6);       //xPad, yPad		
 			add(sub,BorderLayout.WEST);
 			
 			displayImage("red");
 			add(connectedLabel,BorderLayout.EAST);
-	
-			//Display the Chart on his own thread
-			//(new Thread(_moneyChart)).start();
-			_moneyChart.run();	
-			while (_moneyChart.getChartPanel() == null) { 
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);	
 			setVisible( true);
 		}
 		
@@ -271,6 +291,23 @@ public class AutoPanel extends JPanel  {
 			_moneyChart.updateTick(tick);
 			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);	
 			setVisible( true);
+		}
+		
+		public void updateBacktestChart() {
+			//Display the Chart on his own thread
+			//(new Thread(_moneyChart)).start();
+			/*
+			_moneyChart.run();	
+			while (_moneyChart.getChartPanel() == null) { 
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					//TODOasdf
+					e.printStackTrace();
+				}
+			}
+			*/
+			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);
 		}
 		
 		protected void onHistReqToday() {
@@ -294,11 +331,11 @@ public class AutoPanel extends JPanel  {
 					BarResultsPanel panel = new BarResultsPanel( false);
 	//KKTBD				ApiDemo.INSTANCE.controller().reqRealTimeBars(m_contract, m_whatToShow.getSelectedItem(), m_rthOnly.isSelected(), panel);
 					//m_bPanel.addTab( "Real-time " + m_contract.symbol(), panel, true, true);
-					MoneyCommandCenter.shared().LiveTrading = true;
+					MoneyCommandCenter.shared().startLiveTrading();
 					
 				} else {
 					System.out.format("\nAuto Enabled Deselected");
-					MoneyCommandCenter.shared().LiveTrading = false;
+					MoneyCommandCenter.shared().stopLiveTrading();
 				}
 			}
 		}

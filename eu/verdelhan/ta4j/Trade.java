@@ -153,8 +153,10 @@ public class Trade implements IOrderHandler {
      * @return the order
      */
     public Order operate(int index, Decimal price, Decimal amount,boolean longTrade) {
+    	
         Order order = null;
         if (isNew()) {
+        	startingType = (longTrade) ? Order.OrderType.BUY : Order.OrderType.SELL;
             order = new Order(index, startingType, price, amount);
             entry = order;
             
@@ -167,23 +169,26 @@ public class Trade implements IOrderHandler {
 			//b.send( contract.secIdType() );
 			//b.send( contract.secId() );
            
-            placeRealOrderIn();
+            //placeRealOrderIn();
              
         } else if (isOpened()) {
             if (index < entry.getIndex()) {
                 throw new IllegalStateException("The index i is less than the entryOrder index");
             }
+            
+            //Just use the complementType and not the argument passed in
+            Action action = (startingType.complementType() == Order.OrderType.BUY) ? Action.BUY : Action.SELL;
             order = new Order(index, startingType.complementType(), price, amount);
             exit = order;
             
             //KK IB Order to send to exchange
             ibOrderExit = new NewOrder();
-            ibOrderExit.action((longTrade) ? Action.BUY : Action.SELL);
+            ibOrderExit.action(action);
             ibOrderExit.totalQuantity( ibOrderEntry.totalQuantity()); 
             ibOrderExit.orderType(com.ib.controller.OrderType.MKT);
             
             //KK Send order to exchange
-            placeRealOrderOut();
+           // placeRealOrderOut();
         }
         return order;
     }

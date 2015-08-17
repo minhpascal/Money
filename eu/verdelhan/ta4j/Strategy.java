@@ -144,4 +144,9 @@ public class Strategy {
     public boolean isLongTrade() {
     	return longTrade;
     }
+    
+    //Call-up to catch up the timeseries when we start the program
+    public void updateGetValues(int i) {
+    	//purposefully do nothing
+    }
 }

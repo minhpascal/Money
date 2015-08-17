@@ -73,3 +73,13 @@ Chapter 5 Java
    order.m_lmtPrice = enteredLmtPrice;
    m_client.placeOrder(GlobalOrderId, contract, order);
 }
+
+//
+//Java Tips
+//
+//Below has the advantage of keeping syntax and swapping to linked list later
+List<?> myList = new ArrayList<?>();  
+
+//Separate thread for running event loops and graphics
+
+Maven -- Java's Dependency Manager
