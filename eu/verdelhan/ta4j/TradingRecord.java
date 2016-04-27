@@ -140,6 +140,10 @@ public class TradingRecord {
         return !currentTrade.isOpened();
     }
     
+    public boolean isTradeOpen() {
+        return currentTrade.isOpened();
+    }
+    
     /**
      * @return the recorded trades
      */

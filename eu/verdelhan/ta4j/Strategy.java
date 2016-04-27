@@ -25,6 +25,9 @@ package eu.verdelhan.ta4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import apidemo.MoneyFeed;
+import apidemo.MoneyFeed.MovingAverage;
+
 
 /**
  * A trading strategy.
@@ -45,14 +48,19 @@ public class Strategy {
     
     protected boolean longTrade=true;
 
+	public MoneyFeed moneyfeed;
+	public MovingAverage maObject;
+	public String name;
+    
     //KKAdded start
     /**
      * Constructor.
      * @param entryRule the entry rule
      * @param exitRule the exit rule
      */
-    public Strategy() {
- 
+    public Strategy(MoneyFeed moneyfeed,String name) {
+    	this.moneyfeed = moneyfeed;
+    	this.name = name;
 
     }
     //KKAdded end
@@ -62,6 +70,7 @@ public class Strategy {
      * @param entryRule the entry rule
      * @param exitRule the exit rule
      */
+    /*
     public Strategy(Rule entryRule, Rule exitRule) {
         if (entryRule == null || exitRule == null) {
             throw new IllegalArgumentException("Rules cannot be null");
@@ -69,6 +78,7 @@ public class Strategy {
         this.entryRule = entryRule;
         this.exitRule = exitRule;
     }
+    */
     
     /**
      * @param index the tick index
@@ -89,9 +99,9 @@ public class Strategy {
      * @param index the tick index
      * @return true to recommend to enter, false otherwise
      */
-    public boolean shouldEnter(int index) {
-        return shouldEnter(index, null);
-    }
+  //  public boolean shouldEnter(int index) {
+  //      return shouldEnter(index, null);
+  //  }
 
     /**
      * @param index the tick index

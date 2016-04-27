@@ -5,6 +5,7 @@ package apidemo;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -20,13 +21,18 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Timer;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultCellEditor;
@@ -35,6 +41,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.ListCellRenderer;
 import javax.swing.SpringLayout;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
@@ -72,6 +79,7 @@ import com.ib.controller.Types.WhatToShow;
 
 //Charting
 import eu.verdelhan.ta4j.Indicator;
+import eu.verdelhan.ta4j.Strategy;
 import eu.verdelhan.ta4j.Decimal;
 import eu.verdelhan.ta4j.Tick;
 import eu.verdelhan.ta4j.TimeSeries;
@@ -83,6 +91,9 @@ import eu.verdelhan.ta4j.indicators.trackers.bollingerbands.BollingerBandsUpperI
 import java.text.SimpleDateFormat;
 
 import org.joda.time.Period;
+import org.jdatepicker.impl.JDatePanelImpl;
+import org.jdatepicker.impl.JDatePickerImpl;
+import org.jdatepicker.impl.UtilDateModel;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -124,7 +135,6 @@ public class AutoPanel extends JPanel  {
 		setLayout( new BorderLayout() );
 		add( m_autoPanel, BorderLayout.NORTH);
 		add( m_bPanel);
-		
 		
 		/*
 		m_requestPanel.addTab( "Historical Data", new HistRequestPanel() );
@@ -178,7 +188,9 @@ public class AutoPanel extends JPanel  {
 		final ContractPanel m_contractPanel = new ContractPanel(m_contract);
 		private final JLabel m_status = new JLabel("Disconnected");  //removed
 		private JLabel connectedLabel = null;
-		public JCheckBox m_enableAuto = null;
+		public JCheckBox m_enableAuto;
+		public JCheckBox m_enableRealtimeFeed;
+		public JCheckBox m_enableLiveTrading;
 		private final UpperField m_shortMA = new UpperField();
 		private final UpperField m_mediumMA = new UpperField();
 		private final UpperField m_longMA = new UpperField();
@@ -187,9 +199,20 @@ public class AutoPanel extends JPanel  {
 		JPanel _chartPanel=null;
 		
 		MainRequestPanel() {
+			
+			int row=0;
 
 			//Initialize Data Items
 			MoneyCommandCenter.shared().setPanelDelegate(this);  //done for the chart update call back
+			
+			m_enableRealtimeFeed = new JCheckBox();
+			m_enableRealtimeFeed.setSelected(false);
+			m_enableRealtimeFeed.addItemListener(this);
+			
+			m_enableLiveTrading = new JCheckBox();
+			m_enableLiveTrading.setSelected(true);
+			m_enableLiveTrading.addItemListener(this);
+			
 			m_enableAuto = new JCheckBox();
 			m_enableAuto.setSelected(false);
 			m_enableAuto.addItemListener(this);
@@ -202,13 +225,17 @@ public class AutoPanel extends JPanel  {
 			setLayout(new BorderLayout());
 			
 			JPanel sub = new JPanel(new SpringLayout());
-			sub.add(new JLabel("Enable Auto Trading"));
+			sub.add(new JLabel("Enable Realtime Feed")); row++;
+			sub.add(m_enableRealtimeFeed);
+			sub.add(new JLabel("Enable Live Trading"));row++;
+			sub.add(m_enableLiveTrading);
+			sub.add(new JLabel("Enable Auto Trading"));row++;
 			sub.add(m_enableAuto);
-			sub.add(new JLabel("Short Moving Average"));
+			sub.add(new JLabel("Short Moving Average"));row++;
 			sub.add(m_shortMA);
-			sub.add(new JLabel("Medium Moving Average"));
+			sub.add(new JLabel("Medium Moving Average"));row++;
 			sub.add(m_mediumMA);
-			sub.add(new JLabel("Long Moving Average"));
+			sub.add(new JLabel("Long Moving Average"));row++;
 			sub.add(m_longMA);
 			JButton refresh = new JButton("Req Hist");
 			refresh.addActionListener(new ActionListener() {
@@ -220,7 +247,10 @@ public class AutoPanel extends JPanel  {
 			refresh2.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
 				  MoneyCommandCenter.shared().runBacktest(1);
-					_moneyChart._run();	
+				  /*
+					_moneyChart._run();
+					*/
+				  
 					/*
 					while (_moneyChart.getChartPanel() == null) { 
 						try {
@@ -231,29 +261,45 @@ public class AutoPanel extends JPanel  {
 						}
 					}
 					*/
+				  /*
 				  updateBacktestChart();
 				  repaint();
 				  setVisible( true);
+				  */
 			  }
 			});
-			sub.add(refresh);
+			sub.add(refresh);row++;
 			sub.add(refresh2);
 			
 			// Next Row
-			JButton enter = new JButton("Enter");
-			enter.addActionListener(new ActionListener() {
+			JButton enterLong = new JButton("Enter Long");
+			enterLong.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
-				  MoneyCommandCenter.shared().testEnter();
+				  MoneyCommandCenter.shared().manualEnterLong();
+			  }
+			});
+			JButton enterShort = new JButton("Enter Short");
+			enterShort.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().manualEnterShort();
 			  }
 			});
 			JButton exit = new JButton("Exit");
 			exit.addActionListener(new ActionListener() {
 			  public void actionPerformed(ActionEvent e) {
-				  MoneyCommandCenter.shared().testExit();
+				  MoneyCommandCenter.shared().manualExit();
 			  }
 			});
-			sub.add(enter);
-			sub.add(exit);
+			JButton exit2 = new JButton("Exit2");
+			exit.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  MoneyCommandCenter.shared().manualExit();
+			  }
+			});
+			sub.add(enterLong);row++;
+			sub.add(enterShort);
+			sub.add(exit);row++;
+			sub.add(exit2);
 			
 			// Next Row
 			JButton acctSummary = new JButton("Account Summary");
@@ -268,7 +314,7 @@ public class AutoPanel extends JPanel  {
 				  MoneyCommandCenter.shared().reqLiveOrders();
 			  }
 			});
-			sub.add(acctSummary);
+			sub.add(acctSummary);row++;
 			sub.add(openTrades);
 
 			//Dimension dim = sub.getMaximumSize();
@@ -276,7 +322,7 @@ public class AutoPanel extends JPanel  {
 			//System.out.format("Width:%f Height:%f",dim.getWidth(),dim.getHeight());
 		    //Lay out the panel.
 	        SpringUtilities.makeCompactGrid(sub,
-	                                        7, 2, 	//rows, cols
+	                                        row, 2,      //rows, cols
 	                                        6, 6,        //initX, initY
 	                                        6, 6);       //xPad, yPad		
 			add(sub,BorderLayout.WEST);
@@ -307,7 +353,7 @@ public class AutoPanel extends JPanel  {
 				}
 			}
 			*/
-			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);
+			//add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);
 		}
 		
 		protected void onHistReqToday() {
@@ -323,23 +369,48 @@ public class AutoPanel extends JPanel  {
 		public void itemStateChanged(ItemEvent e) {
 			Object source = e.getItemSelectable();
 			
-			
 			if (source == m_enableAuto) {
 				if (e.getStateChange() == ItemEvent.SELECTED)  {
 					System.out.format("\nAuto Enabled Selected");
-					
-					BarResultsPanel panel = new BarResultsPanel( false);
-	//KKTBD				ApiDemo.INSTANCE.controller().reqRealTimeBars(m_contract, m_whatToShow.getSelectedItem(), m_rthOnly.isSelected(), panel);
+
+					//BarResultsPanel panel = new BarResultsPanel( false);
+					//KKTBD				ApiDemo.INSTANCE.controller().reqRealTimeBars(m_contract, m_whatToShow.getSelectedItem(), m_rthOnly.isSelected(), panel);
 					//m_bPanel.addTab( "Real-time " + m_contract.symbol(), panel, true, true);
-					MoneyCommandCenter.shared().startLiveTrading();
-					
+					MoneyCommandCenter.shared().startAutoTrading();
+					MoneyCommandCenter.shared().enableRealtimeFeed();
+					m_enableRealtimeFeed.setSelected(true);
+					MoneyCommandCenter.shared().enableLiveTrading();
+					m_enableLiveTrading.setSelected(true);
+
 				} else {
 					System.out.format("\nAuto Enabled Deselected");
-					MoneyCommandCenter.shared().stopLiveTrading();
+					MoneyCommandCenter.shared().stopAutoTrading();
+				}
+			}
+			else if (source == m_enableRealtimeFeed ) {
+				if (e.getStateChange() == ItemEvent.SELECTED)  {
+					System.out.format("\nRealtimeFeed Enabled Selected");		
+					MoneyCommandCenter.shared().enableRealtimeFeed();
+					MoneyCommandCenter.shared().enableLiveTrading();
+					m_enableLiveTrading.setSelected(true);
+				}
+				else {
+					System.out.format("\nRealtimeFeed Enabled Deselected");
+					MoneyCommandCenter.shared().disableRealtimeFeed();
+				}
+			}
+			else if (source == m_enableLiveTrading ) {
+				if (e.getStateChange() == ItemEvent.SELECTED)  {
+					System.out.format("\nLiveTrading Enabled Selected");		
+					MoneyCommandCenter.shared().enableLiveTrading();
+				}
+				else {
+					System.out.format("\nLiveTrading Enabled Deselected");
+					MoneyCommandCenter.shared().disableLiveTrading();
 				}
 			}
 		}
-		
+	
 		 public void actionPerformed(ActionEvent e) {
 			Object source=e.getSource();
 			//System.out.format("\nActionCommand:%s",source);
@@ -449,11 +520,37 @@ public class AutoPanel extends JPanel  {
 				return rend;
 			}
 		}
-	}		
+	}	
+	
+	private class CustomComboBox extends JLabel implements ListCellRenderer {
+
+		  @Override
+		  public Component getListCellRendererComponent(JList list, Object value,
+		      int index, boolean isSelected, boolean cellHasFocus) {
+
+		    JLabel label = new JLabel() {
+		      public Dimension getPreferredSize() {
+		        return new Dimension(200, 20);
+		      }
+		    };
+		    label.setText(String.valueOf(value));
+
+		    return label;
+		  }
+		} 
 	
 	private class BacktestRequestPanel extends JPanel implements ActionListener{  //ActionListener is for timer
 		final ContractPanel m_contractPanel = new ContractPanel(m_contract);
 		Timer timer;
+	
+		UtilDateModel modelStart;
+		UtilDateModel modelEnd;
+		JDatePanelImpl datePanelStart;
+		JDatePanelImpl datePanelEnd;
+		
+		JDatePickerImpl datePickerStart;
+		JDatePickerImpl datePickerEnd;
+		JComboBox strategyCB;
 		
 		BacktestRequestPanel() {
 			HtmlButton reqDeep = new HtmlButton( "Request Deep Market Data") {
@@ -461,15 +558,86 @@ public class AutoPanel extends JPanel  {
 					onDeep();
 				}
 			};
+			setLayout(new BorderLayout());
 			
-			VerticalPanel butPanel = new VerticalPanel();
-			butPanel.add( reqDeep);
+			//
+			//Set up start and end date range
+			//
+			Properties p = new Properties();
+			p.put("text.today", "Today");
+			p.put("text.month", "Month");
+			p.put("text.year", "Year");
 			
-			setLayout( new BoxLayout( this, BoxLayout.X_AXIS) );
-			//add( m_contractPanel);
-			add( Box.createHorizontalStrut(20));
-			add( butPanel);
+			modelStart = new UtilDateModel();
+			Calendar now =  Calendar.getInstance();
+			now.add(Calendar.WEEK_OF_YEAR, -1);  //Start 1 week earlier
 			
+			modelStart.setValue(now.getTime());		
+			modelEnd = new UtilDateModel();
+			modelEnd.setValue(Calendar.getInstance().getTime());	
+			
+			datePanelStart = new JDatePanelImpl(modelStart,p);
+			datePanelEnd = new JDatePanelImpl(modelEnd,p);
+			
+			datePickerStart = new JDatePickerImpl(datePanelStart,new DateLabelFormatter());
+			datePickerEnd = new JDatePickerImpl(datePanelEnd,new DateLabelFormatter());
+			
+			JPanel sub = new JPanel(new SpringLayout());
+			
+			int row=0;
+			sub.add(new JLabel("Start Date:")); row++;
+			sub.add(datePickerStart);
+			
+			sub.add(new JLabel("End Date:")); row++;
+			sub.add(datePickerEnd);
+			
+			//
+			// Select the Strategy
+			//
+			ArrayList<Strategy> strategies = MoneyCommandCenter.shared().getPossibleBacktestStrategies();
+			String[] strategiesStringList = new String[10];			
+			for (int i=0;i<strategies.size();i++) {
+				strategiesStringList[i] = strategies.get(i).name;
+			}
+			
+			//String[] strategies = { "Bird", "Cat", "Dog" };
+			JComboBox<String> cbo = new JComboBox<String>(strategiesStringList);
+			//cbo.setMinimumSize(new Dimension(300,30));
+			cbo.setPreferredSize(new Dimension(150,30));
+			cbo.setMaximumSize(new Dimension(500,30));
+			//cbo.setRenderer(new CustomComboBox());
+			
+			//Indices start at 0
+			cbo.setSelectedIndex(0);
+			cbo.addActionListener(this);
+			
+			sub.add(new JLabel("Strategy:")); row++;
+			sub.add(cbo);
+			
+			sub.add(new JLabel("Run Backtest"));row++;		
+			JButton runBacktest = new JButton("Scan");
+			sub.add(runBacktest);
+			runBacktest.addActionListener(new ActionListener() {
+			  public void actionPerformed(ActionEvent e) {
+				  
+				  System.out.println("\nScanning from "+datePickerStart.getJFormattedTextField().getText() +" to "+
+						  datePickerEnd.getJFormattedTextField().getText()+" with Strategy:"+cbo.getSelectedItem());
+			  }
+			});
+			
+			//
+			//Make the grid to display 
+			//
+	        SpringUtilities.makeCompactGrid(sub,
+                    row, 2,      //rows, cols
+                    6, 6,        //initX, initY
+                    4, 4);       //xPad, yPad
+	       
+	        //SpringUtilities.printSizes(sub);
+	        add(sub,BorderLayout.WEST);
+	        
+			//add( Box.createHorizontalStrut(20));
+			setVisible(true);
 			//
 			//Timer Experiment
 			//

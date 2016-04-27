@@ -81,7 +81,7 @@ public class ApiDemo implements IConnectionHandler {
 		m_tabbedPanel.addTab( "Combos", m_comboPanel);
 		m_tabbedPanel.addTab( "Contract Info", m_contractInfoPanel);
 		m_tabbedPanel.addTab( "Advisor", m_advisorPanel);
-		// m_tabbedPanel.addTab( "Strategy", m_stratPanel); in progress
+	    m_tabbedPanel.addTab( "Strategy", m_stratPanel); //in progress
 			
 		m_msg.setEditable( false);
 		m_msg.setLineWrap( true);
@@ -108,7 +108,7 @@ public class ApiDemo implements IConnectionHandler {
         // make initial connection to local host, port 7496, client id 0
 		m_controller.connect( "127.0.0.1", 7496, 0);
 		
-		MoneyCommandCenter.shared(); //kk added
+		MoneyCommandCenter.shared();
     }
 	
 	@Override public void connected() {

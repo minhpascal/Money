@@ -71,6 +71,7 @@ public class TradingBotOnMovingTimeSeries {
         ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
         SMAIndicator sma = new SMAIndicator(closePrice, 12);
 
+        /*
         // Signals
         // Buy when SMA goes over close price
         // Sell when close price goes over SMA
@@ -78,7 +79,9 @@ public class TradingBotOnMovingTimeSeries {
                 new OverIndicatorRule(sma, closePrice),
                 new UnderIndicatorRule(sma, closePrice)
         );
-        return buySellSignals;
+        */
+        //return buySellSignals;
+        return null;
     }
 
     /**
@@ -135,7 +138,7 @@ public class TradingBotOnMovingTimeSeries {
             series.addTick(newTick);
             
             int endIndex = series.getEnd();
-            if (strategy.shouldEnter(endIndex)) {
+            if (strategy.shouldEnter(endIndex,null)) {
                 // Our strategy should enter
                 System.out.println("Strategy should ENTER on " + endIndex);
                 if (tradingRecord.getCurrentTrade().isNew()) {

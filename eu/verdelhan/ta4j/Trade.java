@@ -31,6 +31,8 @@ import com.ib.controller.Types.Action;
 import com.ib.controller.Types.SecType;
 
 import apidemo.ApiDemo;
+import apidemo.MoneyCommandCenter;
+
 import com.ib.controller.ApiController.IOrderHandler;
 import eu.verdelhan.ta4j.Order.OrderType;
 
@@ -70,7 +72,7 @@ public class Trade implements IOrderHandler {
     	ibContract.secType(SecType.FUT);
     	ibContract.exchange("GLOBEX");
     	ibContract.currency("USD");
-    	ibContract.expiry("201509");
+    	ibContract.expiry("201512");
     }
 
     /**
@@ -168,8 +170,9 @@ public class Trade implements IOrderHandler {
             
 			//b.send( contract.secIdType() );
 			//b.send( contract.secId() );
-           
-            //placeRealOrderIn();
+ //kkundo           if (MoneyCommandCenter.shared().liveTrading()) {
+ //kkundo           	placeRealOrderIn();
+ //kkundo           }
              
         } else if (isOpened()) {
             if (index < entry.getIndex()) {
@@ -188,7 +191,9 @@ public class Trade implements IOrderHandler {
             ibOrderExit.orderType(com.ib.controller.OrderType.MKT);
             
             //KK Send order to exchange
-           // placeRealOrderOut();
+  //kkundo          if (MoneyCommandCenter.shared().liveTrading()) {
+  //kkundo          	placeRealOrderOut();
+  //kkundo          }
         }
         return order;
     }
@@ -225,20 +230,6 @@ public class Trade implements IOrderHandler {
 	//
 	
 	public void placeRealOrderIn() {
-		
-		
-		// close window right away for mods
-		//if (ib.orderId() != 0) {
-			//kktbddispose();
-		//}
-		
-		// not connected?
-		/*
-		if( !MoneyCommandCenter.shared().isConnected() ) {
-            notConnected();
-			return;
-		}
-		*/
 	
 		ApiDemo.INSTANCE.controller().placeOrModifyOrder( ibContract, ibOrderEntry, this);	
 	}

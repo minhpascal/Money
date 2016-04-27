@@ -107,23 +107,25 @@ public class MoneyChart implements Runnable {
     }
     
 	public void _run() {
-		
-        //series = CsvTradesLoader.loadBitstampSeries().subseries(0, Period.hours(6));
-		TimeSeries series = MoneyCommandCenter.shared().getMainTimeSeries();
+		return;
+
+		/*
+		//series = CsvTradesLoader.loadBitstampSeries().subseries(0, Period.hours(6));
+		TimeSeries series = MoneyCommandCenter.shared().getMoneyFeed().series1min.series;
         
-        /**
-         * Creating the OHLC dataset
-         */
+        
+        //* Creating the OHLC dataset
+        
         OHLCDataset ohlcDataset = CandlestickChart.createOHLCDataset(series);
         
-        /**
-         * Creating the additional dataset
-         */
+        
+        // * Creating the additional dataset
+       
         TimeSeriesCollection xyDataset = CandlestickChart.createAdditionalDataset(series);
         
-        /**
-         * Creating the chart
-         */
+       
+        //Creating the chart
+         
         JFreeChart chart = ChartFactory.createCandlestickChart(
                 "ESU15",
                 "Time",
@@ -149,13 +151,14 @@ public class MoneyChart implements Runnable {
         numberAxis.setAutoRangeIncludesZero(false);
         plot.setDatasetRenderingOrder(DatasetRenderingOrder.FORWARD);
         
-        /**
-         * Running the strategy and adding the buy and sell signals to plot
-         */
+        
+        //Running the strategy and adding the buy and sell signals to plot
+        
         addBuySellSignals(series, MoneyCommandCenter.shared().getCurrentStrategy(), plot);
         
         _chartPanel = CandlestickChart.displayChart(chart);
         _chartPanel.setVisible(true);
+        */
 	}
 	
 

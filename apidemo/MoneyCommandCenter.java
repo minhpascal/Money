@@ -5,12 +5,16 @@ import java.awt.Dimension;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -28,12 +32,15 @@ import org.joda.time.format.DateTimeFormatter;
 
 import apidemo.AutoPanel.BarResultsPanel;
 import apidemo.AutoPanel.BarResultsPanel.BarModel;
+import apidemo.MoneyFeed.MovingAverage;
+import apidemo.MoneyFeed.SLOW_FAST;
 import apidemo.util.HtmlButton;
 import apidemo.util.VerticalPanel;
 import apidemo.util.NewTabbedPanel.NewTabPanel;
 import apidemo.util.VerticalPanel.StackPanel;
 
 import com.ib.client.Builder;
+import com.ib.client.Contract;
 import com.ib.client.EClientErrors;
 import com.ib.client.TagValue;
 import com.ib.controller.AccountSummaryTag;
@@ -97,6 +104,12 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 	// Private constructor. Prevents instantiation from other classes.
 	private MoneyCommandCenter()  { 
 		
+		/*
+		//TBD let's create the list first
+		Map<String, String> dictionary = new HashMap<String, String>();
+		dictionary.put("PrimarySymbol","ESU15.CME");
+		MoneyUtils.shared().writeMainProperties(dictionary);
+		*/
 		Map<String, String> readDict = MoneyUtils.readMainProperties();
 		symbol = readDict.get("PrimarySymbol");
 		System.out.println("READ PrimarySymbol KEY:"+symbol);
@@ -106,20 +119,62 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		m_contract.secType(SecType.FUT);
 		m_contract.exchange("GLOBEX");
 		m_contract.currency("USD");
-		m_contract.expiry("201509");
+		
+		//Get the front month 
+		//TBD this needs to be its own function since we will call this every new day as the front month will change
+		final DateTime nowDT = new DateTime();
+		int yearValue = nowDT.getYear();
+		int monthValue = nowDT.getMonthOfYear();
+		String monthStr = new String();
+		if (monthValue == 11 || monthValue == 0 || monthValue == 1) {
+			monthStr= "03";
+		} else if (monthValue >=2 && monthValue <= 4) {
+			monthStr= "06";
+		} else if (monthValue >=5 && monthValue <= 7) {
+			monthStr= "09";
+		} else if (monthValue >=8 && monthValue <= 10) {
+			monthStr= "12";
+		} else {
+			//Something is really wrong 			
+		}
+		final String contractDateStr = new String(Integer.toString(yearValue) + monthStr);
+		//m_contract.expiry("201606");
+		
+		System.out.println("Date String is "+contractDateStr);
+		m_contract.expiry(contractDateStr);
+		
+		initializeStrategies();
+		
+		//
+		Timer timer = new Timer();
+		timer.schedule(new TimerTask() {
+			  @Override
+			  public void run() {
+				//Start the receiving data right away so that we can continue processing as usual
+				//KKTBD, maybe do a historical view here also
+				enableRealtimeFeed();
+			  }
+		}, 1000);
 	}
 	
 	private NewContract m_contract = new NewContract();
-	
 	private String symbol=new String("ES");
 	
+	//
 	//Class variables
+	//
 	public ChartTickUpdateCallbackHandler _chartHandler=null;
 	public int debugFlag=0;
+	private boolean autoTrading=false;
 	private boolean liveTrading=false;
-	private ArrayList<Bar> barAggregator = new ArrayList<Bar>(12);
-	private TimeSeries mainTimeSeries = new TimeSeries("Main", new Period(5000));
+	private boolean realtimeFeed=false;
+	//private boolean liveAnalysis=false;
+	private MoneyFeed moneyFeed = new MoneyFeed();
 	
+	private ArrayList<Strategy> strategies = new ArrayList<Strategy>(5); //queried from UX
+	private TradingRecord tradingRecord = new TradingRecord();
+	
+	/*
 	//Indicator / Analyzers
 	public ClosePriceIndicator closePrice;
 	public TypicalPriceIndicator typicalPrice;
@@ -134,16 +189,9 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 	public WilliamsRIndicator williamsR;
 	public AverageTrueRangeIndicator atr;
 	public StandardDeviationIndicator sd;
-    
-    private TradingRecord tradingRecord = new TradingRecord();
-    
-    // Building the trading strategy
-    private Strategy strategy;
-    private Strategy currentStrategy;
+    */
 	
-    /** Close price of the last tick */
-    private static Decimal LAST_TICK_CLOSE_PRICE;
-    
+    //private static Decimal LAST_TICK_CLOSE_PRICE;
     private BufferedWriter dayBarWriter;
     
 	private DateTime histNow;
@@ -160,141 +208,113 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		private static final MoneyCommandCenter INSTANCE = new MoneyCommandCenter();
 	}
 	
-	public TimeSeries getMainTimeSeries() {
-		return mainTimeSeries;
+	public static MoneyCommandCenter shared() {
+		return SingletonHolder.INSTANCE;
+	}
+	
+	public MoneyFeed getMoneyFeed() {
+		return moneyFeed;
+	}
+	
+	public TradingRecord getTradingRecord() {
+		return tradingRecord;
 	}
 	
 	public interface ChartTickUpdateCallbackHandler {
 		public void updateTick(Tick tick); // time is in seconds since epoch
 	}
-
-	public static MoneyCommandCenter shared() {
-		return SingletonHolder.INSTANCE;
-	}
-	
 	public void setPanelDelegate(ChartTickUpdateCallbackHandler delegate)
 	{
 		_chartHandler = delegate;
 	}
 	
-	public void startLiveTrading() {
-		liveTrading = true;
+	public boolean autoTrading() {
+		return autoTrading;
+	}
+	
+	public void startAutoTrading() {
+		autoTrading = true;
 		
 		requestHistoricalData();
 		
+		enableRealtimeFeed();
 	}
 	
-	public void stopLiveTrading() {
+	public void stopAutoTrading() {
+		autoTrading = false;
+		
+		disableRealtimeFeed();
+	}
+	
+	//Tell IB to enable realtime quotes
+	public void enableRealtimeFeed() {
+		if (!realtimeFeed) {
+			ApiDemo.INSTANCE.controller().reqRealTimeBars(m_contract,Types.WhatToShow.TRADES, false, this);
+			realtimeFeed = true;
+		}
+	}
+	
+	//Tell IB to disable realtime quotes
+	public void disableRealtimeFeed() {
+		if (realtimeFeed) {
+			ApiDemo.INSTANCE.controller().cancelRealtimeBars(this);
+			realtimeFeed = false;
+		}
+	}
+	
+	public void enableLiveTrading() {	
+		liveTrading = true;
+	}
+	
+	public void disableLiveTrading() {
 		liveTrading = false;
-		
-		ApiDemo.INSTANCE.controller().cancelRealtimeBars( this);
 	}
 	
-	public void start() {
-		//Called after we have loaded the historical data
-		//Load current Execution information from File (m_contract)
-		//Load Live Strategies
-		//Load Feeds		
-		//Cycle through the open Live Strategy to determine if possible exit
+	public ArrayList<Strategy> getPossibleBacktestStrategies() {
 		
-		/*
-		//TBD let's create the list first
-		Map<String, String> dictionary = new HashMap<String, String>();
-		dictionary.put("PrimarySymbol","ESU15.CME");
-		MoneyUtils.shared().writeMainProperties(dictionary);
-		*/
-		
-        
-
-        // Building the trading strategy, TBD cycle through all of the strategies to build them based off of the config file.
-        strategy = buildStrategy(mainTimeSeries);
-        
-		// TODO: Set the max number of units in this series, maybe adjust it real-time in the future
-        mainTimeSeries.setMaximumTickCount(1000);
-        
-        // Request the realtimebars
-        ApiDemo.INSTANCE.controller().reqRealTimeBars(m_contract,Types.WhatToShow.TRADES, false, this);
+		return strategies;
+		//return  new String[] {"1-Red, White, Blue","2-Slow Move Pullback","3-Nightly Slow Move Pullback"};
 	}
 
-    /**
-     * @param series a time series
-     * @return a dummy strategy
-     */
-    private static Strategy buildStrategy(TimeSeries series) {
-        if (series == null) {
-            throw new IllegalArgumentException("Series cannot be null");
-        }
-        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
-        SMAIndicator ssma = new SMAIndicator(closePrice, 8);
-        SMAIndicator lsma = new SMAIndicator(closePrice, 34);
-        MACDEMA macd = new MACDEMA(closePrice, 12, 26, 9);
-        VolumeIndicator volume = new VolumeIndicator(series);
-        VolumeAverageIndicator volumeAverage = new VolumeAverageIndicator(volume,8);
-        
-        return new ESFuturesGapStrategy(closePrice, ssma, lsma,macd, volumeAverage);
-    }
+	public void initializeStrategies() {
+		
+		// Strategies - maybe down the road, read these from a file
+		strategies.add(new ESGenericMACDCrossovers(moneyFeed));
+		//strategies.add(new ESFuturesGapStrategy(moneyFeed));
+		//strategies.add(new ESSlow5Min(moneyFeed));
+	}
 
 	@Override
 	public void realtimeBar(Bar bar) {
+
+		MoneyTickReady tickReady = moneyFeed.realtimeBar5Seconds(bar);
 		
-		Bar finalBar;
-		Tick tick;
-		
-		//System.out.format("\n5 Second Bar:%s", bar.toString());
-		int barSize = 5; //1 minute candlesticks, should be read from config file.
-		int aggMaxCount = barSize/5;  
-		
-		barAggregator.add(bar);
-		if (barAggregator.size() >= aggMaxCount) {  
-			
-			long endTime=bar.time() + 5;  //end time will be this bars start time + 5 seconds.  End time is in seconds.
-			//long m_time;   
-			double high=0;
-			double low=10000;
-			double open=barAggregator.get(0).open();
-			double close=barAggregator.get(aggMaxCount-1).close();
-			double wap=0;
-			long   volume=0;
-			int    count=0;
-			
-			for (Iterator<Bar> iter = barAggregator.listIterator(); iter.hasNext(); ) {
-			    Bar b = iter.next();
-			    //endTime = b.time + 5000;
-			    if (b.high() > high) 
-			    	high = b.high();
-			    if (b.low() < low) 
-			    	low = b.low();
-			    wap += b.wap();
-			    volume += b.volume();
-			    count += b.count();
-			    
-			    iter.remove();  //empty this list of objects
+		//
+		// For each strategy, check if we should enter the trade or not
+		// TBD modify this for when we are in a trade and things go wonky, we must be able to exit.
+		//
+		if (tickReady.somethingsReady()) {
+			for (Strategy s : strategies) {
+				MovingAverage ma = s.maObject;
+				boolean check=false;
+
+				if (tickReady.min1Ready() && ma.getPeriodSeconds() == 1) {
+					check = true;
+				}
+				else if (tickReady.min5Ready() && ma.getPeriodSeconds() == 5) {
+					check = true;
+				}
+				else if (tickReady.min10Ready() && ma.getPeriodSeconds() == 10) {
+					check = true;
+				}
+				else if (tickReady.min15Ready() && ma.getPeriodSeconds() == 15) {
+					check = true;
+				}
+				if (check) {
+					checkShouldEnterOrExit(s);
+				}
 			}
-			wap = wap / aggMaxCount;
-			
-			finalBar= new Bar(endTime,high,low, open , close, wap, volume,count);
-			
-			if (debugFlag != 0) 
-				System.out.format("\n%d Second Bar:%s\n",aggMaxCount*5, finalBar.toString());
-					
-			Period p=new Period(5*aggMaxCount);
-			DateTime d=new DateTime(endTime*1000);
-			tick = new Tick(p,d, open, high, low, close, volume);  //In the future add the WAP and count to the Tick class
-			//System.out.println(tick.toGoodString());			
-			//System.out.format("TickAgain:o:%s h:%s l:%s c:%s v:%s", tick.getOpenPrice(), tick.getMaxPrice(), tick.getMinPrice(), tick.getClosePrice(), tick.getVolume());
 		}
-		else
-			return;
-		
-		System.out.println(tick.toGoodString());
-		
-		//Add this to the stored Series
-		mainTimeSeries.addTick(tick);		
-        LAST_TICK_CLOSE_PRICE = mainTimeSeries.getTick(mainTimeSeries.getEnd()).getClosePrice();
-        
-		//Update each analyzer with this update
-        int endIndex = mainTimeSeries.getEnd();
-        checkShouldEnterOrExit(tick,endIndex);  //KKTBD add the total for the day, sum is returned
  
         /*
 		//Update Chart in the background
@@ -307,20 +327,46 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 	//
 	//KK Manually Entered
 	//
-	public void testEnter() {
+	public void manualEnterLong() {
 		
-		if (liveTrading == false || mainTimeSeries.getTick(mainTimeSeries.getEnd()).getClosePrice().toDouble() < 1) {
+		//Default to the first strategy
+		int endIndex = strategies.get(0).maObject.getEndIndex();
+		if (liveTrading == false || endIndex < 1) {
 			System.out.println("liveTrading is not enabled or no Ticks have been received");
 			return;
 		}
 		
-		Tick tick = mainTimeSeries.getTick(mainTimeSeries.getEnd());
+		Tick tick = strategies.get(0).maObject.series.getTick(endIndex);
 		
         if (tradingRecord.getCurrentTrade().isNew()) {
             // Entering...
-            tradingRecord.operate(mainTimeSeries.getEnd(), tick.getClosePrice(), Decimal.FIVE, true);  //buy/sell 5 contracts at the last price.
+            tradingRecord.operate(endIndex, tick.getClosePrice(), Decimal.FIVE, true);  //buy/sell 5 contracts at the last price.
             Order entry = tradingRecord.getLastEntry();
-            System.out.println("Entered on " + entry.getIndex()
+            System.out.println("Entered LONG on " + entry.getIndex()
+                    + " (price=" + entry.getPrice().toDouble()
+                    + ", amount=" + entry.getAmount().toDouble() + ")");
+        }
+        else {
+        	System.out.println("Can't ENTER, already in trade");
+        }
+	}
+	
+	public void manualEnterShort() {
+		
+		//Default to the first strategy
+		int endIndex = strategies.get(0).maObject.getEndIndex();
+		if (liveTrading == false || endIndex < 1) {
+			System.out.println("liveTrading is not enabled or no Ticks have been received");
+			return;
+		}
+		
+		Tick tick = strategies.get(0).maObject.series.getTick(endIndex);
+		
+        if (tradingRecord.getCurrentTrade().isNew()) {
+            // Entering...
+            tradingRecord.operate(endIndex, tick.getClosePrice(), Decimal.ONE, false);  //buy/sell 5 contracts at the last price.
+            Order entry = tradingRecord.getLastEntry();
+            System.out.println("Entered LONG on " + entry.getIndex()
                     + " (price=" + entry.getPrice().toDouble()
                     + ", amount=" + entry.getAmount().toDouble() + ")");
         }
@@ -332,30 +378,35 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 	//
 	//KK Manually Exited
 	//
-	public void testExit() {
+	public void manualExit() {
 		
-		if (mainTimeSeries.getTick(mainTimeSeries.getEnd()).getClosePrice().toDouble() < 1 || !tradingRecord.getCurrentTrade().isOpened()) {
+		int endIndex = strategies.get(0).maObject.getEndIndex();
+		if (liveTrading == false || endIndex < 1 || !tradingRecord.getCurrentTrade().isOpened()) {
 			System.out.println("No Ticks have been received or there's not active trade here");
-			//KKTBD maybe kick off an account status
 			return;
 		}
-		
+	
         System.out.println("Strategy should EXIT on " + 0);
         
-        Tick tick = mainTimeSeries.getTick(mainTimeSeries.getEnd());
+		Tick tick = strategies.get(0).maObject.series.getTick(endIndex);
         
         if (tradingRecord.getCurrentTrade().isOpened()) {
             // Exiting...
-            tradingRecord.operate(mainTimeSeries.getEnd(), tick.getClosePrice(), Decimal.FIVE, false); //offset 5 contracts at the last price
+        	Decimal quantity = tradingRecord.getCurrentTrade().getEntry().getAmount();
+            tradingRecord.operate(endIndex, tick.getClosePrice(), quantity, false);
             Order exit = tradingRecord.getLastExit();
             System.out.println("Exited on " + exit.getIndex()
                     + " (price=" + exit.getPrice().toDouble()
                     + ", amount=" + exit.getAmount().toDouble() + ")");
         }
         else {
-        	System.out.println("Can't EXIT, already in trade");
+        	System.out.println("No known open trade, checking IB");
+        	
+        	//KK query open positions
+        	
         }
 	}
+	
 	public void reqAcctSummary() {
 		//TotalCashValue
 		AccountSummaryTag[] tags = {AccountSummaryTag.TotalCashValue};
@@ -392,7 +443,7 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		
 		//DateTime dtStart = histNow.withTimeAtStartOfDay();
 		int dtStart = histNow.getSecondOfDay();
-		ApiDemo.INSTANCE.controller().reqHistoricalData(m_contract, endDate, dtStart, DurationUnit.SECOND, BarSize._1_min, WhatToShow.TRADES, false, this);
+		ApiDemo.INSTANCE.controller().reqHistoricalData(m_contract, endDate, dtStart, DurationUnit.SECOND, BarSize._1_min, WhatToShow.TRADES, false, this); //WhatToShow.TRADES
 		
 		//
 		//Just do today
@@ -409,6 +460,9 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		}
 	}
 
+	//
+	//This is writing 1 minute bars to the file, not the 5 second ones
+	//
 	@Override
 	public void historicalData(Bar bar, boolean hasGaps) {
 
@@ -429,9 +483,28 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		try {
 			dayBarWriter.close();
 			
-			if (liveTrading == true) {
+			initializeStrategies();
+
+			//if (liveTrading == true) {
+				//Get the data set up correctly
+				List<Bar> list = processFile(this.getFileNameFromHistNow());
+				
+				for (int i=0;i<list.size();i++) {
+					Bar bar=list.get(i);
+					//MoneyTickReady tickReady = moneyFeed.realtimeBar60Seconds(bar);
+					moneyFeed.realtimeBar60Seconds(bar);
+
+					for (Strategy s : strategies) {
+						//MovingAverage ma = s.maObject;
+						s.updateGetValues(i);
+					}
+				}
+			//}
+				/*
+				 * TBD fix this
+				 
 				//Read the data into the mainTimeSeries from the whole day and request new realTimeBars
-				List<Tick> list = processFile(this.getFileNameFromHistNow());
+				List<Bar> list = processFile(this.getFileNameFromHistNow());
 				mainTimeSeries = new TimeSeries("Main", new Period(3600));
 				
 				start();
@@ -441,7 +514,8 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 					mainTimeSeries.addTick(tick);
 					strategy.updateGetValues(i);  //This must be done to get the strategy caught up
 				}
-			}
+				*/
+			
 		}
 		catch (IOException e)
 		{
@@ -449,38 +523,43 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		}
 	}
 	
-	static public ArrayList<Tick> processFile(String filename)  {
+	static public ArrayList<Bar> processFile(String filename)  {
 		//filename = "ES20150810.ticks30";
 		Path filepath = Paths.get(filename);
-		ArrayList<Tick> ticks = new ArrayList<Tick>(1440);
+		ArrayList<Bar> bars = new ArrayList<Bar>(1440);
 		
 		try {
 			try (Scanner scanner =  new Scanner(filepath, StandardCharsets.UTF_8.name())){
 				while (scanner.hasNextLine()){
-					Tick tick = fromStringToTick(scanner.nextLine());	
-					ticks.add(tick);
+					Bar bar = fromStringToBar(scanner.nextLine());	
+					bars.add(bar);
 				}
 			}
 		}
 		catch (IOException e) {
 			System.err.println("ProcessFile IOException: " + e.getMessage());
 		}		
-	    return ticks;
+	    return bars;
 	}
 	
 	//
 	//Main Check Routine called for each tick and backtesting
 	//
-	private Decimal checkShouldEnterOrExit(Tick tick,int endIndex) {
+	private Decimal checkShouldEnterOrExit(Strategy s) {
+			//Tick tick,int endIndex) {
+	
+		int endIndex = s.maObject.getEndIndex();
+		Tick tick = s.maObject.closePrice.getTimeSeries().getLastTick();
+		
 		Decimal amount=Decimal.ZERO;
 		
-		if (strategy.shouldEnter(endIndex)) {
+		if (s.shouldEnter(endIndex,tradingRecord)) {
 			// Our strategy should enter
 			//System.out.println("Strategy should ENTER on " + endIndex+ " Time:" + tick.toGoodString());
 
 			if (tradingRecord.getCurrentTrade().isNew()) {
 				// Entering...
-				tradingRecord.operate(endIndex, tick.getClosePrice(), Decimal.TEN, strategy.isLongTrade());  //buy/sell 5 contracts at the last price.
+				tradingRecord.operate(endIndex, tick.getClosePrice(), Decimal.TEN, s.isLongTrade());  //buy/sell 5 contracts at the last price.
 				Order entry = tradingRecord.getLastEntry();
 				System.out.println("\nENTER "
 						+ entry.getType().toString()
@@ -493,13 +572,13 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 				System.out.println("Can't ENTER, already in trade");
 			}
 
-		} else if (strategy.shouldExit(endIndex,tradingRecord)) {
+		} else if (s.shouldExit(endIndex,tradingRecord)) {
 			// Our strategy should exit
 			//System.out.format("Strategy should EXIT on ",endIndex);
 
 			if (tradingRecord.getCurrentTrade().isOpened()) {
 				// Exiting...
-				tradingRecord.operate(endIndex, tick.getClosePrice(), Decimal.TEN, strategy.isLongTrade()); //offset 5 contracts at the last price
+				tradingRecord.operate(endIndex, tick.getClosePrice(), Decimal.TEN, s.isLongTrade()); //offset 5 contracts at the last price
 				Order exit = tradingRecord.getLastExit();
 				System.out.println("\nEXIT  " 					
 						+ exit.getType().toString()
@@ -533,15 +612,46 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 	//
 	public void runBacktest(int backtestType) {
 		histUpdateNow();
-		List<Tick> list = processFile(this.getFileNameFromHistNow());
-		TimeSeries testTimeSeries = new TimeSeries("Backtest", new Period(5000));
+		List<Bar> list = processFile(this.getFileNameFromHistNow());  //This gives me a list of 1 minute bars
 		Decimal sum=Decimal.valueOf(0);
 		
+		/*
+		TimeSeries testTimeSeries = new TimeSeries("Backtest", new Period(5000));	
 		strategy = buildStrategy(testTimeSeries);
+		*/
 		
 		for (int i=0;i<list.size();i++) {
-			Tick tick=list.get(i);
+			Bar bar=list.get(i);
+			
+			MoneyTickReady tickReady = moneyFeed.realtimeBar60Seconds(bar);
+			
+			//
+			// For each strategy, check if we should enter the trade or not
+			// TBD modifiy this for when we are in a trade and things go wonky, we must be able to exit.
+			if (tickReady.somethingsReady()) {
+				for (Strategy s : strategies) {
+					MovingAverage ma = s.maObject;
+					boolean check=false;
 
+					if (tickReady.min1Ready() && ma.getPeriodMinutes() == 1) {
+						check = true;
+					}
+					else if (tickReady.min5Ready() && ma.getPeriodMinutes() == 5) {
+						check = true;
+					}
+					else if (tickReady.min10Ready() && ma.getPeriodMinutes() == 10) {
+						check = true;
+					}
+					else if (tickReady.min15Ready() && ma.getPeriodMinutes() == 15) {
+						check = true;
+					}
+					if (check) {
+						sum = sum.plus(checkShouldEnterOrExit(s));
+						break;
+					}
+				}
+			}
+			/*
 			//Add this to the stored Series
 			testTimeSeries.addTick(tick);		
 			LAST_TICK_CLOSE_PRICE = testTimeSeries.getTick(testTimeSeries.getEnd()).getClosePrice();
@@ -551,22 +661,23 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 
 			//Check if we should enter or Exit here
 			sum = sum.plus(checkShouldEnterOrExit(tick,endIndex));
+			*/
 		}	
 		System.out.println("*************************");
 		System.out.format(" TOTAL PROFIT: $%4.2f \n",sum.toDouble());
 		System.out.println("*************************");
 		
+		/*
 		mainTimeSeries = testTimeSeries;
 		currentStrategy = strategy;
+		*/
 		/*
         if (_chartHandler != null) {
         	_chartHandler.updateTick(tick);
         }
         */
 	}
-	public Strategy getCurrentStrategy() {
-		return currentStrategy;
-	}
+
 	//
 	// Used when reading back stored ticks in file
 	//
@@ -582,8 +693,8 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 			String low = scanner.next();
 			String close = scanner.next();
 			String volume = scanner.next();
-			String wap = scanner.next();
-			String count = scanner.next();
+			//String wap = scanner.next();
+			//String count = scanner.next();
 			
 			Period p=new Period(5*12);  // This is for 1 second
 			DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
@@ -601,6 +712,36 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 		}
 		scanner.close();
 		return tick;
+	}
+	
+	static public Bar fromStringToBar(String s) {
+		Bar bar;
+		Scanner scanner = new Scanner(s);
+		scanner.useDelimiter(",");
+		if (scanner.hasNext()) {
+			//assumes the line has a certain structure
+			String time = scanner.next();
+			String open = scanner.next();
+			String high = scanner.next();
+			String low = scanner.next();
+			String close = scanner.next();
+			String volume = scanner.next();
+			String wap = scanner.next();
+			String count = scanner.next();
+			
+			DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
+			DateTime d = dtf.parseDateTime(time);
+			
+			bar = new Bar(d.getMillis() / 1000, Double.parseDouble(high),Double.parseDouble(low),
+							Double.parseDouble(open),Double.parseDouble(close),
+							Double.parseDouble(wap),Long.parseLong(volume),Integer.parseInt(count));
+		}
+		else {
+			System.out.println("Empty or invalid line. Unable to process.");
+			bar=null;
+		}
+		scanner.close();
+		return bar;
 	}
 	
 	//
@@ -629,6 +770,9 @@ public class MoneyCommandCenter  implements IHistoricalDataHandler, IRealTimeBar
 	@Override 
 	public void accountSummary(String account, AccountSummaryTag tag, String value, String currency) {
 		System.out.format("\nIB:accountSummary:account:%s value:$%s currency:%s",account.toString(),value.toString(),currency.toString());
+		
+		//KK for some reason we have to cancel the account summary
+		ApiDemo.INSTANCE.controller().cancelAccountSummary(this);
 	}
 
 	@Override 

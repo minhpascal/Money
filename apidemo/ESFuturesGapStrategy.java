@@ -1,15 +1,48 @@
 package apidemo;
 
 import java.util.List;
+import apidemo.MoneyFeed.MovingAverage;
+import apidemo.MoneyFeed.SLOW_FAST;
+
+/*
+public class MovingMomentumStrategy {
+
+
+    public static Strategy buildStrategy(TimeSeries series) {
+        if (series == null) {
+            throw new IllegalArgumentException("Series cannot be null");
+        }
+
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        
+        // The bias is bullish when the shorter-moving average moves above the longer moving average.
+        // The bias is bearish when the shorter-moving average moves below the longer moving average.
+        EMAIndicator shortEma = new EMAIndicator(closePrice, 9);
+        EMAIndicator longEma = new EMAIndicator(closePrice, 26);
+
+        StochasticOscillatorKIndicator stochasticOscillK = new StochasticOscillatorKIndicator(series, 14);
+
+        MACDIndicator macd = new MACDIndicator(closePrice, 9, 26);
+        EMAIndicator emaMacd = new EMAIndicator(macd, 18);
+        
+        // Entry rule
+        Rule entryRule = new OverIndicatorRule(shortEma, longEma) // Trend
+                .and(new CrossedDownIndicatorRule(stochasticOscillK, Decimal.valueOf(20))) // Signal 1
+                .and(new OverIndicatorRule(macd, emaMacd)); // Signal 2
+        
+        // Exit rule
+        Rule exitRule = new UnderIndicatorRule(shortEma, longEma) // Trend
+                .and(new CrossedUpIndicatorRule(stochasticOscillK, Decimal.valueOf(80))) // Signal 1
+                .and(new UnderIndicatorRule(macd, emaMacd)); // Signal 2
+        
+        return new Strategy(entryRule, exitRule);
+    }
+*/
 
 import eu.verdelhan.ta4j.Decimal;
 import eu.verdelhan.ta4j.Order;
-import eu.verdelhan.ta4j.Rule;
 import eu.verdelhan.ta4j.Strategy;
-import eu.verdelhan.ta4j.Trade;
 import eu.verdelhan.ta4j.TradingRecord;
-import eu.verdelhan.ta4j.indicators.helpers.CrossIndicator;
-import eu.verdelhan.ta4j.indicators.simple.ClosePriceIndicator;
 import eu.verdelhan.ta4j.indicators.simple.VolumeIndicator;
 import eu.verdelhan.ta4j.indicators.trackers.EMAIndicator;
 import eu.verdelhan.ta4j.indicators.trackers.MACDEMA;
@@ -17,42 +50,62 @@ import eu.verdelhan.ta4j.indicators.trackers.MACDIndicator;
 import eu.verdelhan.ta4j.indicators.trackers.SMAIndicator;
 import eu.verdelhan.ta4j.indicators.trackers.VolumeAverageIndicator;
 
-
 public class ESFuturesGapStrategy extends Strategy {
 	private static final double MACD_GAP_SEPARATION_FUDGE=0.8; //When price rises above short ma for entry
 	private static final double MA_GAP_EXIT_FUDGE=0.5;   //When price crosses short ma for exit
 	
+
+	/*
 	private ClosePriceIndicator closePrice;
     private SMAIndicator ssma;
     private SMAIndicator lsma;
+    */
     private MACDEMA macd;
     private EMAIndicator macdEMA;  //this is the slow line on the MACD
     private VolumeAverageIndicator volumeAverage;
-
-    public  boolean inTrade=false;
+	
     public  boolean maAbove=true;
     public  boolean macdAbove=true;
     
-    public ESFuturesGapStrategy(ClosePriceIndicator c, SMAIndicator s, SMAIndicator l, MACDEMA m, VolumeAverageIndicator v) {
-		super();
+    //
+    //Assume Moneyfeed is setup ahead of time
+    //
+    
+    public ESFuturesGapStrategy(MoneyFeed moneyfeed) {
+    		//ClosePriceIndicator c, SMAIndicator s, SMAIndicator l, MACDEMA m, VolumeAverageIndicator v) {
+    	//
+    	//All new strategies must have the following 2 lines
+    	//
+		super(moneyfeed,"ESFuturesGapStrategy");
+		maObject = moneyfeed.getMAObject(1);  //For 1 minute periods
 		
+        macd = new MACDEMA(moneyfeed.series1min.closePrice, 12, 26, 9);
+        VolumeIndicator volume = new VolumeIndicator(moneyfeed.series1min.series);
+        volumeAverage = new VolumeAverageIndicator(volume,8);
+		/*
 		closePrice = c;
 	    ssma = s;
 	    lsma = l;
 	    macd = m;
 	    volumeAverage = v;
-	    
-	    inTrade = false;
+	    */
+		
 	    maAbove = true;  //1 means short is above long
 	    macdAbove = true;
 	}
     
+    //Update the values that the Strategy is managing on it's own, not MoneyFeeds
+    
     public void updateGetValues(int index) {
+    	System.out.println("\nNOT DOING ANYTHING HERE updateGetValues");
+    	/*
     	closePrice.getValue(index);
     	ssma.getValue(index);
     	lsma.getValue(index);
+    	*/
     	macd.getValue(index);
     	volumeAverage.getValue(index);
+    	
     }
 
     //
@@ -67,9 +120,10 @@ public class ESFuturesGapStrategy extends Strategy {
         boolean enter=false; //= entryRule.isSatisfied(index, tradingRecord);
         boolean trigger = false;
         
-        Decimal cp = closePrice.getValue(index);
-        Decimal sma = ssma.getValue(index);  	//short moving average
-        Decimal lma = lsma.getValue(index);  	//long moving average
+        Decimal cp = moneyfeed.series1min.closePrice.getValue(index);
+        Decimal sma = moneyfeed.series1min.fastSMA8.getValue(index);  	//fast moving average
+        Decimal lma = moneyfeed.series1min.slowSMA34.getValue(index);  	//slow moving average
+        
         Decimal macdFast = macd.macdResult(index);  //macd value
         Decimal macdSlow = macd.getValue(index);
         Decimal vo = volumeAverage.getValue(index);
@@ -77,9 +131,9 @@ public class ESFuturesGapStrategy extends Strategy {
         if (index <35)		//don't do anything for the first 35 periods
         	return false;
         
-        if (inTrade) {
+        if (tradingRecord.isTradeOpen()) {
         	return false;
-        }    
+        }   
         //
         //Start Analysis
         //
@@ -87,11 +141,11 @@ public class ESFuturesGapStrategy extends Strategy {
         	if (macdFast.toDouble() < (macdSlow.toDouble() - 0.01) && (macdFast.toDouble() < 0)) {
         		macdAbove = false;
         		trigger = true;
-        		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s ss:%4.2f ls:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
+        		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s ss:%4.2f ls:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
         	}
         } else {
         	if (macdFast.toDouble() > (macdSlow.toDouble() + 0.01) && (macdFast.toDouble() > 0)) {
-        		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s ss:%4.2f ls:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
+        		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s ss:%4.2f ls:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
         		macdAbove = true;
         		trigger = true;
         	}
@@ -102,13 +156,11 @@ public class ESFuturesGapStrategy extends Strategy {
         	if (macdAbove == true) {
 
         		enter = true;
-        		inTrade = true;
         		longTrade = true;
         		
         	} else {
 
         		enter = true;
-        		inTrade = true;
         		longTrade = false;
         	}
         	/*
@@ -182,28 +234,29 @@ public class ESFuturesGapStrategy extends Strategy {
     @Override
     public boolean shouldExit(int index, TradingRecord tradingRecord) {
         boolean exit=false; // = exitRule.isSatisfied(index, tradingRecord);
+       
+        Decimal cp = moneyfeed.series1min.closePrice.getValue(index);
+        Decimal sma = moneyfeed.series1min.fastSMA8.getValue(index);  	//fast moving average
+        Decimal lma = moneyfeed.series1min.slowSMA34.getValue(index);  	//slow moving average
         
         Decimal macdFast = macd.macdResult(index);  //macd value
         Decimal macdSlow = macd.getValue(index);
-        Decimal cp = closePrice.getValue(index);
         
-        if (inTrade == false) {
+        if (!tradingRecord.isTradeOpen()) {
         	return false;
-        }
+        }   
         //
         //Start Analysis
         //
         if (macdAbove) {
         	if (macdFast.toDouble() < (macdSlow.toDouble() - 0.01) && (macdFast.toDouble() < 0)) {
         		exit = true;
-        		inTrade=false;
-        		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s ",macdFast.toDouble(),macdSlow.toDouble(),closePrice.getTimeSeries().getTick(index).toGoodString());
+        		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s ",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getTick(index).toGoodString());
         	}
         } else {
         	if (macdFast.toDouble() > (macdSlow.toDouble() + 0.01) && (macdFast.toDouble() > 0)) {
         		exit = true;
-        		inTrade=false;
-        		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s ",macdFast.toDouble(),macdSlow.toDouble(),closePrice.getTimeSeries().getLastTick().toGoodString());
+        		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s ",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString());
         	}
         }
         if (!exit) {
