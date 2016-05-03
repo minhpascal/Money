@@ -16,6 +16,12 @@ import eu.verdelhan.ta4j.indicators.trackers.SMAIndicator;
 
 public class MoneyFeed {
 	
+	enum GENERAL_MODE {
+		TRENDING,
+		RANGE_BOUND,
+		VOLATILE_BREAKOUTS
+	}
+	
 	enum TREND {
 		TREND_UNKNOWN,
 		TREND_STARTING_UP,
@@ -88,7 +94,7 @@ public class MoneyFeed {
 		public boolean realtimeBarSeconds(Bar bar, int frequency) {  //freq. is either 5 or 60, for the # of seconds between bars (or period)
 			int aggMaxCount = periodSeconds/frequency;  
 			
-			System.out.format("RAW REALTIME BAR %d Second Bar:%s\n",aggMaxCount*frequency, bar.toString());
+			//System.out.format("RAW REALTIME BAR %d Second Bar:%s\n",aggMaxCount*frequency, bar.toString());
 			
 			barAggregator.add(bar);
 			if (barAggregator.size() >= aggMaxCount) {  
@@ -119,7 +125,8 @@ public class MoneyFeed {
 				wap = wap / aggMaxCount;
 				
 				Bar finalBar= new Bar(endTime, high,low, open , close, wap, volume,count); //create the new bar
-				System.out.format("\n%d Second Bar:%s\n",aggMaxCount*frequency, finalBar.toString());
+				if (MoneyCommandCenter.shared().debugFlag != 0)
+					System.out.format("\n%d Second Bar:%s\n",aggMaxCount*frequency, finalBar.toString());
 						
 				//Convert Bar to Tick
 				Period p=new Period(frequency*aggMaxCount);
@@ -164,7 +171,7 @@ public class MoneyFeed {
 	public MovingAverage getMAObject(int periodMinutes) {
 		if (periodMinutes == 1) {
 			if (series1min == null) {
-				series1min = new MovingAverage(1*60); //5 minutes
+				series1min = new MovingAverage(1*60); //1 minute
 			}
 			return series1min;
 		}

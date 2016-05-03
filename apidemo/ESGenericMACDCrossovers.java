@@ -84,25 +84,25 @@ public class ESGenericMACDCrossovers extends Strategy {
         //
         //Start Analysis
         //
-        int ENTER_PRICE_DIFF = 4;
+        int ENTER_PRICE_DIFF = 1;
         
-    	System.out.format("\n%s TICK DATA: fastma:%2.2f slowma:%2.2f: %s ",this.getClass().getName(),fma.toDouble(),sma.toDouble(),
-    			moneyfeed.series1min.closePrice.getTimeSeries().getTick(index).toGoodString());
+    	//System.out.format("\n%s TICK DATA: fastma:%2.2f slowma:%2.2f: %s ",this.getClass().getName(),fma.toDouble(),sma.toDouble(),
+    	//		moneyfeed.series1min.closePrice.getTimeSeries().getTick(index).toGoodString());
         
         if (fma.toDouble() > sma.toDouble() && cp.toDouble() > (fma.toDouble() + ENTER_PRICE_DIFF) && 
         		vol.isGreaterThan(volAverage.multipliedBy(Decimal.THREE)  )) {
         	enter = true;
         	longTrade = true;
         	macdAbove = true;
-        	System.out.format("\n%s SHOULD ENTER: fastma:%2.2f slowma:%2.2f: %s ",this.getClass().getName(),fma.toDouble(),sma.toDouble(),
-        			moneyfeed.series5min.closePrice.getTimeSeries().getTick(index).toGoodString());
+        	System.out.format("\nSHOULD ENTER: fastma:%2.2f slowma:%2.2f: %s ",fma.toDouble(),sma.toDouble(),
+        			moneyfeed.series1min.closePrice.getTimeSeries().getTick(index).toGoodString());
         }
         else if (fma.toDouble() < sma.toDouble() && cp.toDouble() < (fma.toDouble() - ENTER_PRICE_DIFF) &&
         		vol.isGreaterThan(volAverage.multipliedBy(Decimal.THREE)  )) {
         	enter = true;
         	longTrade = false;
         	macdAbove = false;
-        	System.out.format("\n%s SHOULD ENTER: fastma:%2.2f slowma:%2.2f: %s ",this.getClass().getName(),fma.toDouble(),sma.toDouble(),
+        	System.out.format("\nSHOULD ENTER: fastma:%2.2f slowma:%2.2f: %s ",fma.toDouble(),sma.toDouble(),
         			moneyfeed.series1min.closePrice.getTimeSeries().getTick(index).toGoodString());
         }
 

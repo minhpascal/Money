@@ -51,6 +51,7 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.SwingUtilities;
 
 import apidemo.MarketDataPanel.BarResultsPanel;
+import apidemo.MoneyCommandCenter.BacktestCallbackHandler;
 import apidemo.MoneyCommandCenter.ChartTickUpdateCallbackHandler;
 import apidemo.util.HtmlButton;
 import apidemo.util.NewTabbedPanel;
@@ -539,7 +540,7 @@ public class AutoPanel extends JPanel  {
 		  }
 		} 
 	
-	private class BacktestRequestPanel extends JPanel implements ActionListener{  //ActionListener is for timer
+	private class BacktestRequestPanel extends JPanel implements BacktestCallbackHandler,ActionListener{  //ActionListener is for timer
 		final ContractPanel m_contractPanel = new ContractPanel(m_contract);
 		Timer timer;
 	
@@ -550,7 +551,8 @@ public class AutoPanel extends JPanel  {
 		
 		JDatePickerImpl datePickerStart;
 		JDatePickerImpl datePickerEnd;
-		JComboBox strategyCB;
+		String selectedStrategy;
+		TradesPanel tradesPanel = new TradesPanel();
 		
 		BacktestRequestPanel() {
 			HtmlButton reqDeep = new HtmlButton( "Request Deep Market Data") {
@@ -568,13 +570,17 @@ public class AutoPanel extends JPanel  {
 			p.put("text.month", "Month");
 			p.put("text.year", "Year");
 			
+			//Start Date
 			modelStart = new UtilDateModel();
 			Calendar now =  Calendar.getInstance();
-			now.add(Calendar.WEEK_OF_YEAR, -1);  //Start 1 week earlier
+			//now.add(Calendar.WEEK_OF_YEAR, -1);  //Start 1 week earlier
+			now.set(2016, 04, 02);
+			modelStart.setValue(now.getTime());	
 			
-			modelStart.setValue(now.getTime());		
+			//End Date
 			modelEnd = new UtilDateModel();
-			modelEnd.setValue(Calendar.getInstance().getTime());	
+			modelEnd.setValue(Calendar.getInstance().getTime());	//This is what it should be
+			modelEnd.setValue(now.getTime());	//keep this to set it to last week also
 			
 			datePanelStart = new JDatePanelImpl(modelStart,p);
 			datePanelEnd = new JDatePanelImpl(modelEnd,p);
@@ -582,8 +588,7 @@ public class AutoPanel extends JPanel  {
 			datePickerStart = new JDatePickerImpl(datePanelStart,new DateLabelFormatter());
 			datePickerEnd = new JDatePickerImpl(datePanelEnd,new DateLabelFormatter());
 			
-			JPanel sub = new JPanel(new SpringLayout());
-			
+			JPanel sub = new JPanel(new SpringLayout());	
 			int row=0;
 			sub.add(new JLabel("Start Date:")); row++;
 			sub.add(datePickerStart);
@@ -607,7 +612,6 @@ public class AutoPanel extends JPanel  {
 			cbo.setMaximumSize(new Dimension(500,30));
 			//cbo.setRenderer(new CustomComboBox());
 			
-			//Indices start at 0
 			cbo.setSelectedIndex(0);
 			cbo.addActionListener(this);
 			
@@ -617,11 +621,16 @@ public class AutoPanel extends JPanel  {
 			sub.add(new JLabel("Run Backtest"));row++;		
 			JButton runBacktest = new JButton("Scan");
 			sub.add(runBacktest);
+			BacktestCallbackHandler tempThis = this;  //done just to get the parent this variable into the backtest
+				
 			runBacktest.addActionListener(new ActionListener() {
+			  @Override
 			  public void actionPerformed(ActionEvent e) {
-				  
-				  System.out.println("\nScanning from "+datePickerStart.getJFormattedTextField().getText() +" to "+
-						  datePickerEnd.getJFormattedTextField().getText()+" with Strategy:"+cbo.getSelectedItem());
+				  String start = new String(datePickerStart.getJFormattedTextField().getText());
+				  String end = new String(datePickerEnd.getJFormattedTextField().getText());
+				  selectedStrategy = (String)cbo.getSelectedItem();
+				  MoneyCommandCenter.shared().backtestGatherPriceDataWithDateRange(start,end,selectedStrategy,tempThis);
+				  System.out.println("\nScanning from "+start +" to "+ end +" with Strategy:"+selectedStrategy);
 			  }
 			});
 			
@@ -635,6 +644,7 @@ public class AutoPanel extends JPanel  {
 	       
 	        //SpringUtilities.printSizes(sub);
 	        add(sub,BorderLayout.WEST);
+	        add(tradesPanel);
 	        
 			//add( Box.createHorizontalStrut(20));
 			setVisible(true);
@@ -646,14 +656,27 @@ public class AutoPanel extends JPanel  {
 			//timer = new Timer(1000);
 	        //timer.setInitialDelay(pause);
 	        //timer.start(); 
-	 
 	    }
+		
+		//
+		// Step 2 of now running the strategy over this time period.  Step 1 was getting all of the price data
+		//
+		public void btCallback(int phase,Object obj) {
+			System.out.println("\nbtCallback: Phase: "+phase);
+			if (phase == 0) {
+				String start = new String(datePickerStart.getJFormattedTextField().getText());
+				String end = new String(datePickerEnd.getJFormattedTextField().getText());
+				MoneyCommandCenter.shared().backtestFromFileDataWithDateRange(start,end,selectedStrategy,(BacktestCallbackHandler)this);
+			}
+			else if (phase == 1) {
+				//Enter this data here into the Backtest window.  Cast obj to the row entry object
+			}
+		}
+		
 	    //Handle timer event. Update the loopslot (frame number) and the
 	    //offset.  If it's the last frame, restart the timer to get a long
 	    //pause between loops.
 	    public void actionPerformed(ActionEvent e) {
-	        //If still loading, can't animate.
-	    	//System.out.format("Timer Fired");	
 	    	
 	    	//kck add update the chart here
 		}
