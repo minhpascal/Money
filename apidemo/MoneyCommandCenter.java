@@ -673,7 +673,7 @@ public class MoneyCommandCenter
 	//
 	private String getContractMonthForDate(Date date) {
 		DateTime dt = new DateTime(date);
-		int monthValue = dt.getMonthOfYear();
+		int monthValue = dt.getMonthOfYear()-1; //Joda is 1 relative
 		String monthStr = new String();
 		
 		if (monthValue == 11 || monthValue == 0 || monthValue == 1) {
@@ -690,17 +690,6 @@ public class MoneyCommandCenter
 		return monthStr;
 	}
 	
-	/*
-	private String getContractMonthStringFromDate(Date date) {
-		DateTime dt = new DateTime(date);
-		DateTimeFormatter dtfYear = DateTimeFormat.forPattern("yyyy");
-		DateTimeFormatter dtfMMdd = DateTimeFormat.forPattern("MMdd");
-		String contractMonth = getContractMonthForDate(date);
-		
-		return new String(dtfYear.print(dt) + contractMonth + "_" + dtfMMdd.print(dt));
-	}
-	*/
-	
 	//This is for the portion of the file name for the price data
 	public String getPriceDataFilename(String symbol, Date date) {
 		DateTime dt = new DateTime(date);
@@ -709,7 +698,7 @@ public class MoneyCommandCenter
 		String contractMonth = getContractMonthForDate(date);
 		String contractMonthString = new String(dtfYear.print(dt) + contractMonth + "_" + dtfMMdd.print(dt));
 		
-		return new String("priceData/" + symbol + "/" + symbol + contractMonthString + ".ticks60");
+		return new String("priceData/" + symbol + "/" + symbol + contractMonthString + "_60.txt");
 	}
 
 	public void requestHistoricalPriceDataDay(String symbol, Date date) {
@@ -721,6 +710,7 @@ public class MoneyCommandCenter
 		// Get Date stuff set up
 		DateTimeFormatter dtfDay = DateTimeFormat.forPattern("yyyyMMdd");
 		DateTime dt = new DateTime(date);
+		//dt.plusDays(1);
 		String day = dtfDay.print(dt);
 		String endDate = new String(day + " " + "24:00:00");
 		

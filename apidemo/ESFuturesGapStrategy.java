@@ -51,9 +51,10 @@ import eu.verdelhan.ta4j.indicators.trackers.SMAIndicator;
 import eu.verdelhan.ta4j.indicators.trackers.VolumeAverageIndicator;
 
 public class ESFuturesGapStrategy extends Strategy {
-	private static final double MACD_GAP_SEPARATION_FUDGE=0.8; //When price rises above short ma for entry
-	private static final double MA_GAP_EXIT_FUDGE=0.5;   //When price crosses short ma for exit
 	
+	private static final double MACD_GAP_SEPARATION_FUDGE=0.2; //When MACD slow/fast comparison
+	private static final double MA_GAP_EXIT_FUDGE=0.5;   //When price crosses short ma for exit
+	private static final double MA_PRICE_GAP_SEPARATION_FUDGE=2; //When price rises above long ma for entry
 
 	/*
 	private ClosePriceIndicator closePrice;
@@ -72,7 +73,6 @@ public class ESFuturesGapStrategy extends Strategy {
     //
     
     public ESFuturesGapStrategy(MoneyFeed moneyfeed) {
-    		//ClosePriceIndicator c, SMAIndicator s, SMAIndicator l, MACDEMA m, VolumeAverageIndicator v) {
     	//
     	//All new strategies must have the following 2 lines
     	//
@@ -82,14 +82,6 @@ public class ESFuturesGapStrategy extends Strategy {
         macd = new MACDEMA(moneyfeed.series1min.closePrice, 12, 26, 9);
         VolumeIndicator volume = new VolumeIndicator(moneyfeed.series1min.series);
         volumeAverage = new VolumeAverageIndicator(volume,8);
-		/*
-		closePrice = c;
-	    ssma = s;
-	    lsma = l;
-	    macd = m;
-	    volumeAverage = v;
-	    */
-		
 	    maAbove = true;  //1 means short is above long
 	    macdAbove = true;
 	}
@@ -137,20 +129,27 @@ public class ESFuturesGapStrategy extends Strategy {
         //
         //Start Analysis
         //
+        //System.out.format("\n%s macdFast:%4.3f macdSlow:%4.3f",moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),macdFast.toDouble(),macdSlow.toDouble());
+        
         if (macdAbove) {
-        	if (macdFast.toDouble() < (macdSlow.toDouble() - 0.01) && (macdFast.toDouble() < 0)) {
+        	if (macdFast.toDouble() < (macdSlow.toDouble() - MACD_GAP_SEPARATION_FUDGE) && 
+        	   (macdFast.toDouble() < 0) &&
+        	   cp.toDouble() < (lma.toDouble() - MA_PRICE_GAP_SEPARATION_FUDGE)  //Compare to the 13 period average
+        	   ) {
         		macdAbove = false;
         		trigger = true;
-        		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s ss:%4.2f ls:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
+        		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s sma:%4.2f lma:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
         	}
         } else {
-        	if (macdFast.toDouble() > (macdSlow.toDouble() + 0.01) && (macdFast.toDouble() > 0)) {
-        		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s ss:%4.2f ls:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
+        	if (macdFast.toDouble() > (macdSlow.toDouble() + MACD_GAP_SEPARATION_FUDGE) && 
+        	    (macdFast.toDouble() > 0) && 
+        	    cp.toDouble() > (lma.toDouble() + MACD_GAP_SEPARATION_FUDGE)
+        	   ) {
+        		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s sma:%4.2f lma:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
         		macdAbove = true;
         		trigger = true;
         	}
         }
-        
         if (trigger) {
         	
         	if (macdAbove == true) {
@@ -163,62 +162,9 @@ public class ESFuturesGapStrategy extends Strategy {
         		enter = true;
         		longTrade = false;
         	}
-        	/*
-        	if (maAbove) {
-        		if (sma.toDouble() < lma.toDouble()) {
-        			maAbove = false;
-        			//System.out.format("\nClose Cross Down: Time %s Close:%4.2f ss:%4.2f ls:%4.2f",closePrice.getTimeSeries().getLastTick().toGoodString(),cp.toDouble(),ss.toDouble(),ls.toDouble());
-        		}
-        	} else {
-        		if (sma.toDouble() > lma.toDouble()) {
-        			//System.out.format("\nClose Cross Up  : Time %s Close:%4.2f ss:%4.2f ls:%4.2f",closePrice.getTimeSeries().getLastTick().toGoodString(),cp.toDouble(),ss.toDouble(),ls.toDouble());
-        			maAbove = true;
-            		enter = true;
-            		inTrade=true;
-            		longTrade=true;
-        		}
-        	}
-        	*/
         }
         
         //System.out.format("\n%s macdFast:%4.3f macdSlow:%4.3f",closePrice.getTimeSeries().getLastTick().toGoodString(),macdFast.toDouble(),macdSlow.toDouble());
-
-        
-        //System.out.format("\nShould Enter??: Close:%4.2f ss:%4.2f ls:%4.2f",cp.toDouble(),ss.toDouble(),ls.toDouble());
-        /*
-        if (closeShortMACrossUp.getValue(index)) {
-            System.out.format("\nClose Cross Up  : Time:%s Close:%4.2f ss:%4.2f ls:%4.2f",closePrice.getTimeSeries().getLastTick().toGoodString(),cp.toDouble(),ss.toDouble(),ls.toDouble());
-        } else if (closeShortMACrossDown.getValue(index)) {
-        	 System.out.format("\nClose Cross Down: Time %s Close:%4.2f ss:%4.2f ls:%4.2f",closePrice.getTimeSeries().getLastTick().toGoodString(),cp.toDouble(),ss.toDouble(),ls.toDouble());
-        }
-        */
-        
-        /*
-        //Check price is greater than short and long moving averages
-        if (cp.isGreaterThan(ss) && ss.isGreaterThan(ls)) {
-        	Decimal malV = mal.plus(Decimal.valueOf(MACD_GAP_SEPARATION_FUDGE));  //add variable
-        	System.out.format("AAAAA");
-        	if (ma.isGreaterThan(Decimal.valueOf(0)) && mas.isGreaterThan(malV)) {
-        		//Add checking volume here
-        		
-        		enter = true;
-        		inTrade=true;
-        		longTrade=true;
-        	}
-        }
-        else if (cp.isLessThan(ss) && ss.isLessThan(ls)) {
-        	Decimal malV = mal.minus(Decimal.valueOf(MACD_GAP_SEPARATION_FUDGE));  //add variable
-        	System.out.format("BBBBBB");
-        	if (ma.isLessThan(Decimal.valueOf(0)) && mas.isLessThan(malV)) {
-        		//Add checking volume here
-        		
-        		enter = true;
-        		inTrade=true;
-        		longTrade=false;
-        	}
-        }
-        */
-        
         
         if (enter) {
         	traceShouldEnter(index, enter);
@@ -249,31 +195,43 @@ public class ESFuturesGapStrategy extends Strategy {
         //Start Analysis
         //
         if (macdAbove) {
-        	if (macdFast.toDouble() < (macdSlow.toDouble() - 0.01) && (macdFast.toDouble() < 0)) {
+        	if (macdFast.toDouble() < (macdSlow.toDouble() - 0.01) ) { //&& (macdFast.toDouble() < 0) ) {
         		exit = true;
         		System.out.format("\nMACD Fast Cross Down fast: %2.3f slow:%2.3f: %s ",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getTick(index).toGoodString());
         	}
         } else {
-        	if (macdFast.toDouble() > (macdSlow.toDouble() + 0.01) && (macdFast.toDouble() > 0)) {
+        	if (macdFast.toDouble() > (macdSlow.toDouble() + 0.01)) {  //fast is greater than slow 
+        			//(macdFast.toDouble() > 0)) { 
         		exit = true;
         		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s ",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString());
         	}
         }
-        if (!exit) {
+       // if (!exit) {
         	Order entry=tradingRecord.getLastOrder();
+        	Decimal priceDiff;        	    			
+        	Decimal amount;
         	
-        	Decimal priceDiff;        	
-        	priceDiff = cp.minus(entry.getPrice()).abs();       			
-        	Decimal amount = priceDiff.multipliedBy(entry.getAmount().multipliedBy(Decimal.valueOf(50)));
-        	
-        	/*
-        	if (amount.toDouble() > 3000) {
-        		exit = true;
-        		inTrade = false;
-        		System.out.format("\nExiting Trade b/c of Profit Max");
+        	if (longTrade) {
+        		priceDiff = cp.minus(entry.getPrice()); 
         	}
-        	*/
-        }
+        	else {
+        		priceDiff = entry.getPrice().minus(cp);
+        	}
+        	amount = priceDiff.multipliedBy(entry.getAmount().multipliedBy(Decimal.valueOf(50)));
+        	
+        	int min = -500;
+        	int max = 3000;
+        	
+        	if (amount.toDouble() > max) {
+        		exit = true;
+        		System.out.format("\nExiting Trade b/c of Profit Max:"+max);
+        	}
+        	else if (amount.toDouble() < min) {
+           		exit = true;
+        		System.out.format("\nExiting Trade b/c of Profit Max:750"+min);
+        	}
+        	
+       // }
  
         traceShouldExit(index, exit);
         return exit;
