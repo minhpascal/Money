@@ -101,7 +101,8 @@ public class ApiDemo implements IConnectionHandler {
 		
         m_frame.add( m_tabbedPanel);
         m_frame.add( bot, BorderLayout.SOUTH);
-        m_frame.setSize( 1024, 768);
+       // m_frame.setSize( 1024, 768);
+        m_frame.setSize(1200,800);
         m_frame.setVisible( true);
         m_frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE);
         

@@ -160,7 +160,7 @@ public class MoneyCommandCenter
 	private boolean liveTrading = false;
 	private boolean realtimeFeed = false;
 	// private boolean liveAnalysis=false;
-	private MoneyFeed moneyFeed = new MoneyFeed();
+	public MoneyFeed moneyFeed = new MoneyFeed();
 
 	private ArrayList<Strategy> strategies = new ArrayList<Strategy>(5); // queried from UX
 	private TradingRecord tradingRecord = new TradingRecord();
@@ -435,8 +435,8 @@ public class MoneyCommandCenter
 
 		System.out.println("Date:" + startCal.getTime());
 		Decimal sum = Decimal.valueOf(0);
-		for (Date date = startCal.getTime(); !startCal.after(endCal); startCal.add(Calendar.DATE,
-				1), date = startCal.getTime()) {
+		for (Date date = startCal.getTime(); !startCal.after(endCal); startCal.add(Calendar.DATE, 1),
+				 				date = startCal.getTime()) {
 			// Do your job here with `date`.
 			System.out.println("backtestFromFileDataWithDateRange:" + date);
 

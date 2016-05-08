@@ -335,9 +335,13 @@ public class AutoPanel extends JPanel  {
 		
 		public void updateTick(Tick tick)
 		{
+			/*
 			_moneyChart.updateTick(tick);
-			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);	
+			
+			add(_moneyChart.getChartPanel(),BorderLayout.SOUTH);
+				
 			setVisible( true);
+			*/
 		}
 		
 		public void updateBacktestChart() {
@@ -552,6 +556,7 @@ public class AutoPanel extends JPanel  {
 		JDatePickerImpl datePickerStart;
 		JDatePickerImpl datePickerEnd;
 		String selectedStrategy;
+		MoneyChart moneyChart=new MoneyChart();
 		TradesPanel tradesPanel = new TradesPanel();
 		
 		BacktestRequestPanel() {
@@ -644,7 +649,8 @@ public class AutoPanel extends JPanel  {
 	       
 	        //SpringUtilities.printSizes(sub);
 	        add(sub,BorderLayout.WEST);
-	        add(tradesPanel);
+	        //add(tradesPanel);
+	        add(moneyChart.getChartPanel());
 	        
 			//add( Box.createHorizontalStrut(20));
 			setVisible(true);
@@ -669,7 +675,17 @@ public class AutoPanel extends JPanel  {
 				MoneyCommandCenter.shared().backtestFromFileDataWithDateRange(start,end,selectedStrategy,(BacktestCallbackHandler)this);
 			}
 			else if (phase == 1) {
-				//Enter this data here into the Backtest window.  Cast obj to the row entry object
+				SwingUtilities.invokeLater(new Runnable() {
+		            public void run() {
+		                remove(moneyChart.getChartPanel());
+		                moneyChart.updateChart(MoneyCommandCenter.shared().moneyFeed.getMAObject(1).series);
+		                moneyChart.getChartPanel().repaint();
+		                add(moneyChart.getChartPanel());
+		                revalidate();
+		                
+		            }
+				});
+				//moneyChart.getChartPanel().setVisible( true);
 			}
 		}
 		

@@ -133,7 +133,7 @@ public class ESFuturesGapStrategy extends Strategy {
         
         if (macdAbove) {
         	if (macdFast.toDouble() < (macdSlow.toDouble() - MACD_GAP_SEPARATION_FUDGE) && 
-        	   (macdFast.toDouble() < 0) &&
+        	  // (macdFast.toDouble() < 0) &&
         	   cp.toDouble() < (lma.toDouble() - MA_PRICE_GAP_SEPARATION_FUDGE)  //Compare to the 13 period average
         	   ) {
         		macdAbove = false;
@@ -142,7 +142,7 @@ public class ESFuturesGapStrategy extends Strategy {
         	}
         } else {
         	if (macdFast.toDouble() > (macdSlow.toDouble() + MACD_GAP_SEPARATION_FUDGE) && 
-        	    (macdFast.toDouble() > 0) && 
+        	    //(macdFast.toDouble() > 0) && 
         	    cp.toDouble() > (lma.toDouble() + MACD_GAP_SEPARATION_FUDGE)
         	   ) {
         		System.out.format("\nMACD Fast Cross Up   fast: %2.3f slow:%2.3f: %s sma:%4.2f lma:%4.2f",macdFast.toDouble(),macdSlow.toDouble(),moneyfeed.series1min.closePrice.getTimeSeries().getLastTick().toGoodString(),sma.toDouble(),lma.toDouble());
@@ -228,7 +228,7 @@ public class ESFuturesGapStrategy extends Strategy {
         	}
         	else if (amount.toDouble() < min) {
            		exit = true;
-        		System.out.format("\nExiting Trade b/c of Profit Max:750"+min);
+        		System.out.format("\nExiting Trade b/c of Profit Min"+min);
         	}
         	
        // }

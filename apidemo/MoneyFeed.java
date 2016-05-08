@@ -55,11 +55,12 @@ public class MoneyFeed {
 		
 		private int periodSeconds=0;
 		public ArrayList<Bar> barAggregator = new ArrayList<Bar>(100);
+		public int globalCount = 0;
 		
 		public MovingAverage(int periodSeconds) {
 			
 			series = new TimeSeries(String.valueOf(periodSeconds), new Period(periodSeconds*1000));
-			series.setMaximumTickCount(1000);
+			//series.setMaximumTickCount(1000);
 			
 	        closePrice = new ClosePriceIndicator(series);
 	        fastSMA8 = new SMAIndicator(closePrice, 8);
@@ -94,7 +95,7 @@ public class MoneyFeed {
 		public boolean realtimeBarSeconds(Bar bar, int frequency) {  //freq. is either 5 or 60, for the # of seconds between bars (or period)
 			int aggMaxCount = periodSeconds/frequency;  
 			
-			//System.out.format("RAW REALTIME BAR %d Second Bar:%s\n",aggMaxCount*frequency, bar.toString());
+			//System.out.format("RAW REALTIME BAR %d Second Bar:%s BarTime:%d \n",aggMaxCount*frequency, bar.toString(), bar.time());
 			
 			barAggregator.add(bar);
 			if (barAggregator.size() >= aggMaxCount) {  
@@ -102,7 +103,7 @@ public class MoneyFeed {
 				long endTime=bar.time() + frequency;  //end time will be this bars start time + 5 seconds.  End time is in seconds.
 				//long m_time;   
 				double high=0;
-				double low=99999;
+				double low=9999999;
 				double open=barAggregator.get(0).open();  //first bar in list
 				double close=bar.close(); //last bar in the list, which is this bar
 				double wap=0;
@@ -129,8 +130,12 @@ public class MoneyFeed {
 					System.out.format("\n%d Second Bar:%s\n",aggMaxCount*frequency, finalBar.toString());
 						
 				//Convert Bar to Tick
-				Period p=new Period(frequency*aggMaxCount);
+				Period p=new Period(frequency*aggMaxCount*1000);
 				DateTime d=new DateTime(endTime*1000);
+				
+				//if (globalCount < 200)
+				//	System.out.format("DateTime:"+d+" Period:"+frequency*aggMaxCount + "\n");
+				
 				Tick tick = new Tick(p,d, open, high, low, close, volume);  //In the future add the WAP and count to the Tick class
 				series.addTick(tick);
 				if (MoneyCommandCenter.shared().debugFlag != 0)

@@ -88,6 +88,10 @@ public class Trade implements IOrderHandler {
         
     }
     
+    public OrderType getStartingType() {
+    	return startingType;
+    }
+    
     public void setOrderType(OrderType type) {
     	startingType = type;
     }
